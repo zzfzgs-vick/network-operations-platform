@@ -1,0 +1,207 @@
+# MVP scope and non-goals
+
+## Decision state
+
+### Decided
+
+- Provide two operating views: a leadership-level overview and an operator-level diagnostic view.
+- Manage hundreds of switches, servers, and other infrastructure devices.
+- Monitor core links and important business paths.
+- Support TCP Connect, ICMP, HTTP, and DNS active probes.
+- Support SNMPv2c for compatibility and use SNMPv3 as the secure default.
+- Receive SNMP Traps.
+- Represent regions, sites, equipment rooms, device groups, devices, interfaces, and links in a hierarchical topology.
+- Observe interface state, traffic, utilization, errors, discards, latency, packet loss, and health.
+- Support alert acknowledgement, recovery, suppression, maintenance windows, and upstream-root-cause aggregation.
+- Use a single-center deployment and the built-in Collector Node `central-default` for all MVP collection and probing.
+- Preserve the Collector Node identity on tasks, observations, metrics, and alerts, without implementing distributed collection operations.
+- Treat manually configured, controlled-imported, confirmed, or locked asset and topology data as Desired State.
+- Keep SNMP, interface-table, LLDP, CDP, ARP, MAC-table, and active-probe facts as source-attributed, time-bounded Observed State.
+- Derive Effective State without silently overwriting Desired State; display unconfirmed observations as unconfirmed and create differences for conflicts.
+- Apply ownership per field rather than assigning one owner to an entire device record.
+- Allow operators to accept, reject, ignore, merge, lock, or mark topology differences as false positives, subject to the difference type.
+- Never physically delete a previously observed device, interface, or relation automatically; retain history and audit evidence.
+- Support manual asset editing, controlled CSV import, SNMP interface discovery, LLDP candidate-neighbor discovery, candidate confirmation or rejection, and desired-versus-observed difference views.
+- Use immutable, platform-generated `managedDeviceId`, `deviceInstanceId`, `interfaceId`, and `topologyRelationId` values as formal identity.
+- Separate the logical Managed Device from physical or virtual Device Instances so confirmed hardware replacement preserves logical topology while retiring the old instance.
+- Treat management IP, names, serial number, MAC, and `ifIndex` as matching evidence or mutable attributes rather than formal identity.
+- Automatically associate only unique, conflict-free strong evidence; require review for medium or weak evidence, ambiguity, and conflicts.
+- Record matching evidence, confidence, and rule version for automatic identity decisions.
+- Support interface-class-specific matching and avoid duplicate creation after reboot, module replacement, or `ifIndex` change.
+- Represent multiple hardware members behind one management IP without requiring complete vendor-specific stack recognition.
+- Support audited confirmation, rejection, merge, undo, replacement, interface rebind, and split operations without physically deleting identity history.
+- Deploy production on one Ubuntu Server 24.04 LTS host with Docker Engine and Docker Compose, one PostgreSQL instance, and one VictoriaMetrics node.
+- Recover host, disk, Docker, database, or service failure manually; container restart is not host-level high availability.
+- Display the production shape as single-host and non-HA in administrative deployment status; never present container restart as automatic host failover.
+- Protect Class A State with an RPO of at most 4 hours and an RTO of at most 4 hours.
+- Protect Class B Metrics with an RPO of at most 24 hours and an RTO of at most 8 hours, restoring Class A State and current collection first.
+- Treat Class C Regenerable Data as outside disaster-recovery backup requirements.
+- Store backups outside the production host, physical disk, and Docker volumes; backup-target failure produces an operational alert.
+- Use four-hourly PostgreSQL custom-format logical backups and daily VictoriaMetrics snapshots copied with the supported backup tooling.
+- Complete and measure at least one restore from a blank host before production acceptance, then rehearse at least quarterly and after material storage or deployment changes.
+- Require an External Availability Check that does not depend on the platform itself.
+- Expose storage and collector degradation without presenting stale data as healthy.
+- Provide local Platform Users with immutable `userId`, local password authentication, user enablement and disablement, administrator-led user creation and reset, and forced password change after temporary-password login.
+- Enforce permission-based, default-deny RBAC through System Administrator, Network Administrator, Operator, Auditor, and Executive Viewer templates.
+- Enforce authorization in backend APIs; frontend button visibility is not an authorization boundary.
+- Use a mature password hash, preferring Argon2id, with unique random salts and upgradeable security parameters.
+- Require passwords of at least 12 characters, support long passwords without truncation, reject common weak passwords and username reuse, and avoid mechanical composition rules or meaningless periodic rotation.
+- Rate-limit login failures without permanent automatic lockout and return errors that do not reveal whether a user exists.
+- Use revocable Sessions with secure cookies, identifier rotation, idle and absolute limits, and revocation after logout, password change/reset, user disablement, or permission reduction.
+- Audit authentication, user lifecycle, Role assignment, Permission-template, Session revocation, and Emergency Administrator events without recording secrets.
+- Provide a separately controlled Emergency Administrator and a one-time non-Web bootstrap process for the first administrator.
+- Keep business modules dependent on normalized platform identity and Permissions, not password hashes or external identity-provider structures.
+- Reserve External Identity for future integration while implementing local permission-level TOTP in the MVP.
+- Require RFC 6238 TOTP for every user whose effective Permission set contains a Sensitive Permission; Role names do not determine MFA.
+- Treat `users.manage`, `roles.manage`, `credentials.manage`, `system.configure`, `authentication.manage`, `sessions.manage`, `backup.manage`, and `restore.execute` as the initial Sensitive Permissions and allow equivalent future Permissions to join the policy.
+- Delay newly granted Sensitive Permissions until password reauthentication and verified TOTP enrollment complete in a new Session.
+- Provide encrypted per-user TOTP authenticators, one-time Recovery Codes, controlled administrator reset, Emergency Administrator recovery, independent MFA throttling, and recent-MFA checks for sensitive operations.
+- Require reliable host time synchronization and alert on material clock drift rather than widening the TOTP validation window indefinitely.
+- Serve the React console, `/api/`, `/events/`, and any future `/ws/` endpoint from one HTTPS origin.
+- Store revocable opaque Web Sessions in PostgreSQL, place only a 256-bit random Session Token in a host-only Cookie, and persist only its fixed-length hash.
+- Separate 5-minute non-extendable Pre-authentication Sessions from Authenticated Sessions with 30-minute idle and 12-hour absolute timeouts.
+- Rotate Session Tokens across password, MFA, privilege, and recovery boundaries; never upgrade a Pre-authentication Token into an authenticated Token.
+- Use `authorizationVersion` to invalidate Sessions after Role, Permission, Sensitive Permission, or user-status changes.
+- Protect Cookie-authenticated state changes with server-enforced CSRF controls in addition to `SameSite`.
+- Allow explicit User Activity, but not SSE heartbeat, WebSocket Ping/Pong, automatic refresh, polling, or passive display, to extend idle lifetime.
+- Revalidate SSE and any future WebSocket connections against revocation, expiry, and Authorization Version.
+- Invalidate every restored historical Session after disaster recovery.
+- Deliver the Executive Dashboard as an authenticated, read-only MVP view for Executive Viewer users.
+- Show overall health, core-device online rate, core-link availability, major alerts, affected sites and businesses, aggregate topology, 24-hour trends, utilization and instability rankings, and current incident status.
+- Support automatic real-time refresh, Fullscreen Mode, 1920×1080 presentation, and basic 4K adaptation without changing ordinary Session security.
+- Serve Executive Display Data through dedicated read-only aggregation APIs protected by `dashboard.executive.read`, rather than reusing sensitive administrator responses.
+- Stop protected refresh and long connections on Session expiry and mark retained data stale with the last successful update time.
+- Define MVP-S1 as a conditional target of 500 Managed Devices, 30,000 Managed Interfaces, 2,000 enabled active probes, 5,000 formal or candidate topology relations, 50 concurrent authenticated Web Sessions, and 5 concurrent Executive Dashboards.
+- Validate short-term safe degradation at 120% of MVP-S1 without treating that Stress Load as guaranteed capacity.
+- Bind capacity claims to the decided collection periods, metric budget, retention, reference host, browser, workload mix, and performance objectives.
+- Retain raw metrics for 90 days by default, alert and audit records for at least one year, and archived asset and topology history without silent deletion.
+- Keep active time series at or below a 500,000 design budget, sustained writes at or below 20,000 samples/s, and short peaks at or below 30,000 samples/s unless metric and label design is reviewed.
+- Use controlled time-series labels and keep unbounded request, trace, event, user-input, Session, and raw-message values out of label sets.
+- Expose Capacity Risk beyond Verified Capacity rather than hard-coding a 500-device product or licensing limit.
+- Model Alert Rules, stable Alert Fingerprints, continuous Alert Instances, and append-only Alert State Transitions as distinct concepts.
+- Create a new Alert Instance when a resolved Fingerprint recurs; never overwrite a resolved episode into a new firing period.
+- Keep detection, acknowledgement, notification, suppression, and data-validity state as independent Alert facets.
+- Model Incident as a separate human-coordination layer with `DECLARED`, `INVESTIGATING`, `MITIGATING`, `MONITORING`, `RESOLVED`, `CLOSED`, and `CANCELED` states.
+- Link one or more Alert Instances to an Incident through audited roles for root cause, symptom, impact, or related evidence without coupling their lifecycles.
+- Support manual Incident declaration and limited, explainable deterministic automatic declaration and correlation; not every Alert creates an Incident.
+- Preserve append-only Incident Timeline, historical cause and impact snapshots, audited close and reopen behavior, and at least one current primary owner.
+- Separate Alert Severity, Incident Severity, and Incident Priority, and audit authorized Incident reassessment without changing source Alert severity.
+- Continue rule evaluation during Maintenance Windows while allowing policy-controlled notification suppression and Incident declaration.
+- Retain downstream Alert facts during upstream-root-cause suppression and expose unknown, stale, or unreachable data honestly.
+- Treat Notification Delivery as a separate outcome that cannot block or determine Alert or Incident persistence.
+- Keep Alert and Incident lifecycle and handling history authoritative in PostgreSQL-backed platform state for at least one year.
+- Provide distinct Alert and Incident operator views; show only major open Incidents and aggregate Alert counts on the Executive Dashboard.
+- Keep PostgreSQL Condition Definitions, Condition Versions, Alert Rules, and Alert Rule Versions authoritative for their separate layers; generated `vmalert` configuration is a versioned Condition deployment artifact.
+- Normalize Observations into identity-resolved Facts or Metrics, then produce shared three-valued Condition Evaluations before Alert or Health processing.
+- Execute Metric Condition Definitions in `vmalert` and Direct Fact Condition Definitions in the platform condition boundary.
+- Deliver metric Condition Evaluations through a private authenticated batch path and restore completeness through periodic Condition Reconciliation.
+- Bind Alert Rules and Health Policies to the same Condition Versions instead of duplicating MetricsQL, thresholds, windows, freshness, hysteresis, or result dimensions.
+- Keep Alert Engine and Health Engine as parallel Condition consumers; neither derives the shared condition from Alert Instance, Health Status, notification, acknowledgement, or Incident state.
+- Support versioned Condition Assignment, Condition Execution Binding, Alert Rule Condition Binding, Health Policy Condition Binding, and an acyclic Condition Dependency graph.
+- Support `TRUE`, `FALSE`, and `UNKNOWN` Condition State with explicit three-valued `ALL`, `ANY`, `NOT`, `QUORUM`, `SEQUENCE`, and `DEPENDENCY` composition.
+- Distinguish shared `conditionFor` and `conditionRecoveryFor` from Alert-only `alertPromotionDelay` and delivery-only `notificationDelay`.
+- Use shared Direct Fact Conditions for interface state, freshness, and source availability after Observation normalization.
+- Treat repeated and out-of-order evaluations idempotently using separate Alert Fingerprint and Alert Episode identities.
+- Never infer metric Alert recovery merely from missing pushes, evaluator failure, stale data, or unavailable sources.
+- Version, validate, cycle-check, test, preview, publish, verify, audit, and roll back Condition deployments without accepting arbitrary production YAML uploads.
+- Keep `vmalert` execution state in VictoriaMetrics for restart continuity and reconciliation without treating it as permanent Alert history.
+- Keep Alertmanager outside the MVP Alert Instance and Silence authority chain; the platform owns notification grouping, suppression, limits, and delivery records.
+- Represent authoritative Health Status only as `HEALTHY`, `DEGRADED`, `CRITICAL`, or `UNKNOWN`.
+- Model Operational Mode and Data Quality independently so maintenance never replaces the actual health fact.
+- Use a nullable, explainable 0-to-100 Health Score only for ranking, trends, peer comparison, and supporting judgment.
+- Require `healthScore = null` when `UNKNOWN` evidence is insufficient; never treat unknown as confirmed failure or health.
+- Attach one primary and optional secondary Health Reasons, Coverage Ratio, policy version, calculation time, and validity to health results.
+- Provide versioned object-specific policies for device, interface, circuit, and site health, with business and Collector policy boundaries preserved.
+- Use critical dependency, weighted component, quorum, redundancy-group, and percentage-threshold aggregation as explicitly selected by policy instead of simple averaging.
+- Include unknown objects in the active healthy-ratio denominator and expose health-data coverage separately.
+- Apply shared per-input freshness Conditions and Condition-owned recovery and hysteresis so missing data and threshold jitter cannot produce false Alert or Health transitions.
+- Preserve Current Health, append-only Health Transitions, selected Health Snapshots, and explainable Health Score Breakdowns without duplicating every raw metric.
+- Continue health calculation and fact retention during maintenance while suppressing notification or automatic Incident creation only according to maintenance policy.
+- Propagate upstream loss as downstream `UNKNOWN` with `UPSTREAM_UNREACHABLE` rather than inventing independent critical failures.
+- Run one modular NestJS codebase through independent HTTP API and Platform Worker entry points and Docker containers.
+- Keep authentication, configuration, queries, user commands, SSE connection management, validation, and audit context in the HTTP API process; keep long-running Condition, Health, Alert, reconciliation, notification, expiry, cleanup, and other background work in the Platform Worker.
+- Use a NestJS standalone application context for the Platform Worker without starting a public HTTP listener or calling the platform's own public API for shared business logic.
+- Commit business state and its Outbox Message or Background Job in the same PostgreSQL transaction before an API request returns an accepted result.
+- Keep Go services responsible for protocol collection and normalization, and `vmalert` responsible for Metric Condition Evaluation, without allowing either to own final Health, Alert, Incident, maintenance, authorization, or formal-topology state.
+- Use PostgreSQL as the authoritative Inbox, Transactional Outbox, Background Job Queue, Worker Lease, attempt, retry, idempotency, and Dead Letter coordination store.
+- Apply at-least-once delivery with idempotent consumers and database uniqueness rather than claiming exactly-once execution.
+- Recover finite-lease work after Worker failure or restart, use bounded classified retries with backoff and jitter, and expose exhausted work as auditable, retryable Dead Letter Records.
+- Reserve Advisory Locks for low-cardinality singleton coordination and use row locks, leases, unique constraints, and optimistic versions for ordinary work.
+- Let the Worker persist state and durable frontend events while the API enforces Session and RBAC rules and owns SSE connections; any PostgreSQL `LISTEN/NOTIFY` use is only a non-authoritative wake-up optimization.
+- Prioritize security, core-state, Alert, and Health work over discovery, inventory, reporting, and cleanup while preventing permanent low-priority starvation.
+- Keep Redis queues, NATS, Kafka, RabbitMQ, NestJS microservice transports, Temporal, and other brokers or workflow engines outside MVP until measured distributed or queue-pressure triggers justify a new ADR.
+
+### Current assumptions
+
+- The center management network can directly reach every device and probe target in the MVP scope.
+
+### Deferred to specifications and tickets
+
+- Concrete Condition Definitions and per-object Health Policy mappings, weights, coverage minima, freshness intervals, and Alert promotion thresholds. These are specification and Ticket decisions, not blockers for project scaffolding.
+- The inventory and field mapping required for migration from the retired platform. Migration implementation is not a blocker for project scaffolding.
+
+## Non-goals
+
+- Distributed or remote Collector Node registration and operation.
+- Collector certificate issuance or mTLS.
+- Remote task scheduling across sites.
+- Collector offline buffering and replay.
+- Collector automatic upgrades.
+- Multi-node high availability.
+- NAT traversal.
+- Autonomous alerting while disconnected from the center.
+- Syslog ingestion.
+- NetFlow ingestion.
+- Business-dependency modeling beyond the confirmed MVP path view.
+- Security-operations capabilities.
+- A message system by default; NATS JetStream may be evaluated only after a concrete distributed requirement exists.
+- Redis without a measured or explicitly required caching need.
+- Automatic reconstruction of the published topology from discovery results.
+- Unattended merging of discovered assets or relations.
+- Complex bidirectional CMDB synchronization.
+- Priority orchestration across multiple external sources.
+- Automatic network-device configuration changes.
+- Machine-learning topology inference.
+- Machine-learning device or interface identity inference.
+- Automatic recognition of every vendor stack or virtual-chassis technology.
+- Unattended complex device merging.
+- Automatic identity coordination across multiple CMDBs.
+- Automatic repair of incorrect asset data.
+- PostgreSQL automatic failover or point-in-time recovery.
+- VictoriaMetrics clustering.
+- Docker Swarm or Kubernetes.
+- Hot standby, cross-site disaster recovery, virtual-IP failover, or automatic restore to a standby host.
+- Multiple control-plane or collector replicas for high availability.
+- Zero-downtime upgrades.
+- AD, LDAP, OIDC, SAML, Keycloak, SCIM, social login, external-directory synchronization, multi-provider priority, or external-user auto-provisioning.
+- Self-registration or user-requested elevation.
+- A custom identity-provider platform.
+- Attribute-based access control or per-device authorization.
+- SMS or email verification as a second factor.
+- Push MFA, WebAuthn/FIDO2, hardware security keys, biometrics, multiple simultaneous TOTP devices, external-provider MFA, or risk-adaptive authentication.
+- Browser access JWTs, Redis-backed Sessions, remember-me Sessions, cross-site frontend/API deployment, third-party embedding, multi-domain Session Cookies, or URL Session Tokens.
+- Kiosk mode, Display Session, automatic login, permanent login, device binding, public passwordless dashboard URLs, IP-only authentication bypass, or browser-restart auto-authentication.
+- Cross-day automatic renewal or background activity that keeps an Executive Viewer Session alive indefinitely.
+- Performance claims above MVP-S1, one thousand or more concurrent Web users, millions of active time series, unlimited raw retention, or untested hardware configurations.
+- Multi-host horizontal scaling, VictoriaMetrics clustering, PostgreSQL HA, multi-center collection, or cross-region disaster recovery for capacity purposes.
+- A complete ITSM, bidirectional external work-order synchronization, complex on-call scheduling, chat, video, or automatic telephone escalation.
+- Machine-learning or unexplained probabilistic root-cause analysis, natural-language Incident classification, or unattended complex Incident merging.
+- Automatic Incident closure, automatic postmortem generation, complete change management, or deletion of historical Alerts to reduce UI volume.
+- A platform-built MetricsQL evaluator, Node.js scanning of all time series, or two parallel authorities for Metric Condition execution.
+- Direct user editing or uploading of production `vmalert` configuration, arbitrary executable alert scripts, or unaudited rule hot changes.
+- Alertmanager as the authoritative Alert, Incident, history, or Silence store.
+- Multiple highly available `vmalert` replicas or cross-host rule execution in the MVP.
+- Machine-learning or opaque health scoring, arbitrary user health scripts, or automatic tuning of every weight.
+- A universal formula for every object type, simple arithmetic averaging of site health, or use of Health Score as a replacement for Alert and Incident.
+- Treating `UNKNOWN` as score 0, counting it as healthy, hiding underlying failures during maintenance, or rewriting health history after a policy change.
+- Duplicate MetricsQL, thresholds, freshness calculations, or shared time windows embedded independently in Alert Rule, Health Policy, API, Go service, dashboard, or report.
+- Health calculation from Alert acknowledgement, notification, suppression, Incident state, or manually adjusted Alert Severity.
+- Alert condition calculation from final Health Status or Health Score.
+- Cyclic Condition dependencies, arbitrary Condition scripts, machine-generated thresholds, or Redis as an authoritative Condition store.
+- A public HTTP listener for the Platform Worker or Worker-to-self calls through the ordinary user API.
+- Redis Queue, BullMQ, NATS, Kafka, RabbitMQ, NestJS Microservices Transport, Temporal, or another message broker or workflow engine in the MVP runtime.
+- Exactly-once execution claims, process-local mutexes as cross-process coordination, permanent `processing` flags, or silent loss of exhausted work.
+
+## Scope-change trigger
+
+If a required network cannot be reached from the center, distributed collection remains blocked until a new ADR and formal specification define its security, scheduling, delivery, and failure semantics.
