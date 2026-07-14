@@ -7,8 +7,8 @@
 ```mermaid
 flowchart TD
   subgraph P0["Phase 0 工程基线"]
-    T001["T001 跨平台 Monorepo 与质量基线"]
-    T002["T002 最小运行骨架"]
+    T001["T001 DONE · 跨平台 Monorepo 与质量基线"]
+    T002["T002 READY · 最小运行骨架"]
   end
   subgraph P1["Phase 1 运行基础设施"]
     T003["T003 本地 Compose 基础设施"]
@@ -244,7 +244,7 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001 完成后先执行 T002；T002 完成后 T003 与 T005 可以并行。
+- T001 已完成，当前先执行 T002；T002 完成后 T003 与 T005 可以并行。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
@@ -253,7 +253,7 @@ flowchart TD
 
 ## 当前首个可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md) 是唯一无前置依赖的 Ticket，因此是当前唯一 READY Ticket。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md) 已为 DONE。[T002：最小运行骨架](T002-minimal-runtime-skeletons.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
 
 ## DAG 检查规则
 

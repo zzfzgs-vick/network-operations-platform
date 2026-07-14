@@ -1,7 +1,14 @@
 # T001：跨平台 Monorepo 与质量基线
 
 ## 状态
-READY
+DONE
+
+## 完成记录
+
+- Windows 本地验收：通过。
+- Ubuntu GitHub Actions CI：通过（用户确认）。
+- 对应 Git Commit：`5e35a6a60fdf671b647a78cc04fa805847e04b71`。
+- CI 可识别信息：GitHub Actions workflow `quality`，matrix job `ubuntu-24.04`，对应上述 Git Commit；当前未提供 Run ID 或运行 URL。
 
 ## 目标
 建立不含业务功能的原生 npm workspace、单一 Go 模块和 Windows/Ubuntu 一致质量入口。

@@ -13,7 +13,7 @@
 - `DONE`
 - `SUPERSEDED`
 
-仅当前置 Ticket 全部 `DONE` 后才可把 Ticket 改为 `READY`。当前唯一 READY Ticket 是 [T001](T001-cross-platform-monorepo-quality-baseline.md)。Ticket 编号永久保留，不复用；完成后可保持原位，确需归档时移入 `completed/`，不改变编号或文件名。
+仅当前置 Ticket 全部 `DONE` 后才可把 Ticket 改为 `READY`。[T001](T001-cross-platform-monorepo-quality-baseline.md) 已为 `DONE`；当前唯一 `READY` Ticket 是 [T002](T002-minimal-runtime-skeletons.md)。Ticket 编号永久保留，不复用；完成后可保持原位，确需归档时移入 `completed/`，不改变编号或文件名。
 
 ## 工作规则
 

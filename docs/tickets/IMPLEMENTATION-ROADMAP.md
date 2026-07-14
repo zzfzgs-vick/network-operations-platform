@@ -1,6 +1,6 @@
 # MVP Implementation Roadmap
 
-状态：已拆分，等待从 T001 开始实施
+状态：T001 已完成，T002 已就绪
 
 ## 权威来源
 
@@ -15,16 +15,16 @@
 
 - 11 个 Epic/实施阶段（Phase 0～10）。
 - 60 张稳定编号 Ticket。
-- T001 是唯一 READY Ticket；其余均因至少一个未完成前置依赖而为 PLANNED。
+- T001 为 DONE；T002 是唯一 READY Ticket；其余 Ticket 均因至少一个未完成前置依赖而为 PLANNED。
 - 数字顺序是合法拓扑顺序；部分同阶段 Ticket 可在共同前置完成后并行。
 - 非目标只作为范围守卫映射到验收 Ticket，不生成实现 Ticket。
 
 ## Phase 0：工程基线
 
-| Ticket | 交付 | 前置 | 并行性 |
-| --- | --- | --- | --- |
-| [T001](T001-cross-platform-monorepo-quality-baseline.md) | 跨平台 Monorepo 与质量基线 | 无 | 按依赖 |
-| [T002](T002-minimal-runtime-skeletons.md) | 最小运行骨架 | T001 | 按依赖 |
+| Ticket | 交付 | 前置 | 状态 | 并行性 |
+| --- | --- | --- | --- | --- |
+| [T001](T001-cross-platform-monorepo-quality-baseline.md) | 跨平台 Monorepo 与质量基线 | 无 | DONE | 按依赖 |
+| [T002](T002-minimal-runtime-skeletons.md) | 最小运行骨架 | T001 | READY | 按依赖 |
 
 ## Phase 1：运行基础设施
 
@@ -341,5 +341,5 @@
 
 ## 首个执行项
 
-当前只执行 [T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)。完成并标记 DONE 后，T002 才能进入 READY。
+当前首个可执行项是 [T002：最小运行骨架](T002-minimal-runtime-skeletons.md)。T001 已为 DONE，T002 的全部前置依赖均已完成，因此 T002 是唯一 READY Ticket。
 

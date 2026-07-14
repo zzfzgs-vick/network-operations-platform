@@ -1,7 +1,7 @@
 # T002：React、NestJS API/Worker 与 Go 最小运行骨架
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 让四个运行入口独立构建、启动、报告版本并优雅停止，不包含业务能力。
