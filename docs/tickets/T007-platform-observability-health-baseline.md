@@ -2,7 +2,14 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- Windows 11 本地质量、迁移、真实 PostgreSQL 18.4、运行健康及跨进程冒烟验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `b89100583908e8a3fe2ad4b9a03ae3db78bd4a89`；CI 可移植性修正 `5c8414589b7f75c58156962552ea261a37a7f776`、`db6a3c145c6348c0cf2f35b46ee3ddb12726cec7`。
+- CI 可识别信息：GitHub Actions workflow `quality`，最终通过 run `29347400192`，Ubuntu job `87134578951`，Windows job `87134578995`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29347400192>。
 
 ## 目标
 

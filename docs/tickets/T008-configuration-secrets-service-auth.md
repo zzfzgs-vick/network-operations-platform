@@ -1,7 +1,7 @@
 # T008：配置加载、Secret 边界与内部服务认证
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 为 API、Worker、Go、PostgreSQL、VictoriaMetrics 和 vmalert 建立可验证且不泄密的配置边界。
