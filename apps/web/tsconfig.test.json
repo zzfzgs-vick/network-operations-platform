@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "noEmit": false,
+    "outDir": "dist/test",
+    "rootDir": "src",
+    "types": ["node", "react", "react-dom"]
+  },
+  "files": [],
+  "include": ["src"]
+}

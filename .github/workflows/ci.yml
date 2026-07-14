@@ -38,3 +38,16 @@ jobs:
         if: runner.os == 'Linux'
         shell: sh
         run: sh scripts/verify.sh
+      - run: npm run typecheck --workspaces
+      - run: npm run test --workspaces
+      - run: npm run build --workspaces
+      - run: go test ./...
+      - run: go build ./...
+      - name: Smoke runtimes on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/smoke-runtimes.ps1
+      - name: Smoke runtimes on Ubuntu
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/smoke-runtimes.sh

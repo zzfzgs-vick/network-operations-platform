@@ -28,6 +28,18 @@ READY
 - `apps/platform/`
 - `services/collector/`
 - `scripts/smoke-runtimes.*`
+- `scripts/workspace-baseline.test.ts`
+- `.github/workflows/ci.yml`
+- `package-lock.json`
+- `go.mod`
+
+T002 引入 Node 运行骨架依赖，必须同步更新根级唯一 npm 锁文件以保证 npm ci 可复现。
+
+新增首个 Go Package 后，go mod tidy 证明与 go directive 同版本的 toolchain directive 是冗余项，必须删除以保持 go.mod 规范化和可重复测试。
+
+根级 Workspace 基线测试必须同步验证规范化后的 Go 1.26.5 directive，且不得继续要求冗余 toolchain directive。
+
+现有 CI 必须执行 T002 的 Workspace、Go 和运行入口验收，避免运行骨架损坏时仍错误通过。
 
 ## 禁止修改范围
 不得添加数据库访问、认证、SNMP、探测、业务模块或后台业务循环。
@@ -74,4 +86,3 @@ READY
 ## 后续 Ticket
 - [T003](T003-local-compose-infrastructure.md)
 - [T005](T005-shared-contracts-error-model.md)
-

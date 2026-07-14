@@ -64,7 +64,7 @@ test("workspace exposes the required cross-platform quality contract", async () 
     /^module github\.com\/zzfzgs-vick\/network-operations-platform$/m,
   );
   assert.match(goModule, /^go 1\.26\.5$/m);
-  assert.match(goModule, /^toolchain go1\.26\.5$/m);
+  assert.doesNotMatch(goModule, /^toolchain\s/m);
 
   for (const file of requiredFiles) {
     const content = await readFile(file, "utf8");
