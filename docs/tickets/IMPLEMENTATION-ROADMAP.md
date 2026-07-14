@@ -1,6 +1,6 @@
 # MVP Implementation Roadmap
 
-状态：T001、T002 已完成，T003 已就绪
+状态：T001～T003 已完成，T004 已就绪
 
 ## 权威来源
 
@@ -15,7 +15,7 @@
 
 - 11 个 Epic/实施阶段（Phase 0～10）。
 - 60 张稳定编号 Ticket。
-- T001、T002 为 DONE；T003 是当前唯一 READY Ticket；其余 Ticket 保持 PLANNED。
+- T001～T003 为 DONE；T004 是当前唯一 READY Ticket；其余 Ticket 保持 PLANNED。
 - 数字顺序是合法拓扑顺序；部分同阶段 Ticket 可在共同前置完成后并行。
 - 非目标只作为范围守卫映射到验收 Ticket，不生成实现 Ticket。
 
@@ -30,8 +30,8 @@
 
 | Ticket | 交付 | 前置 | 状态 | 并行性 |
 | --- | --- | --- | --- | --- |
-| [T003](T003-local-compose-infrastructure.md) | 本地 Compose 基础设施 | T002 | READY | 可与同前置项并行 |
-| [T004](T004-postgres-migration-data-access-baseline.md) | 迁移与数据库访问基线 | T003 | PLANNED | 按依赖 |
+| [T003](T003-local-compose-infrastructure.md) | 本地 Compose 基础设施 | T002 | DONE | 可与同前置项并行 |
+| [T004](T004-postgres-migration-data-access-baseline.md) | 迁移与数据库访问基线 | T003 | READY | 按依赖 |
 | [T005](T005-shared-contracts-error-model.md) | 共享协议与生成防漂移 | T002 | PLANNED | 可与同前置项并行 |
 | [T006](T006-postgres-reliable-work-tracer.md) | PostgreSQL 可靠工作纵切 | T004, T005 | PLANNED | 按依赖 |
 | [T007](T007-platform-observability-health-baseline.md) | 平台可观测性基线 | T003, T006 | PLANNED | 按依赖 |
@@ -341,5 +341,4 @@
 
 ## 首个执行项
 
-当前首个可执行项是 [T003：本地 Compose 基础设施](T003-local-compose-infrastructure.md)。T001、T002 已为 DONE，T003 的全部前置依赖均已完成，因此 T003 是当前唯一 READY Ticket。
-
+当前首个可执行项是 [T004：PostgreSQL 迁移与数据库访问基线](T004-postgres-migration-data-access-baseline.md)。T001～T003 已为 DONE，T004 的全部前置依赖均已完成，因此 T004 是当前唯一 READY Ticket。

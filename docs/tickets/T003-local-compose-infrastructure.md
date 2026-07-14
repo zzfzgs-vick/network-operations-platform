@@ -1,7 +1,13 @@
 # T003：本地开发 Docker Compose 基础设施
 
 ## 状态
-READY
+DONE
+
+## 完成记录
+- Windows 本地质量验收与 PowerShell 入口验证：通过；PowerShell 通过现有 WSL Ubuntu 24.04 Docker Engine 完成 Compose 操作。
+- WSL Ubuntu 24.04 基础设施验收：通过，包括镜像构建、健康检查、loopback 端口、PostgreSQL 18.4 容器重建持久性以及 Down/Clean 语义。
+- 对应 Git Commit：`bfcf34cdcf8b32a6830753c0b0abb212c0b66048`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29316483669`，Ubuntu job `87031597579`，Windows job `87031597595`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29316483669>。
 
 ## 目标
 提供仅用于本地开发的 PostgreSQL、VictoriaMetrics 和 vmalert 可重复启动环境及基础镜像构建。
