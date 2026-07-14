@@ -104,8 +104,17 @@ services:
       <<: *platform-database-environment
       HOST: 0.0.0.0
       PORT: 3000
+      VICTORIAMETRICS_URL: http://victoriametrics:8428
+      VMALERT_URL: http://vmalert:8880
+      PLATFORM_HEALTH_TIMEOUT_MS: ${PLATFORM_HEALTH_TIMEOUT_MS:-2000}
+      WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
+      WORKER_HEARTBEAT_STALE_AFTER_MS: ${WORKER_HEARTBEAT_STALE_AFTER_MS:-15000}
     depends_on:
       postgres:
+        condition: service_healthy
+      victoriametrics:
+        condition: service_healthy
+      vmalert:
         condition: service_healthy
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
@@ -116,7 +125,14 @@ services:
       context: ../..
       dockerfile: deploy/docker/platform.Dockerfile
     command: ["node", "apps/platform/dist/worker.js"]
-    environment: *platform-database-environment
+    environment:
+      <<: *platform-database-environment
+      VICTORIAMETRICS_URL: http://victoriametrics:8428
+      VMALERT_URL: http://vmalert:8880
+      PLATFORM_HEALTH_TIMEOUT_MS: ${PLATFORM_HEALTH_TIMEOUT_MS:-2000}
+      WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
+      WORKER_HEARTBEAT_STALE_AFTER_MS: ${WORKER_HEARTBEAT_STALE_AFTER_MS:-15000}
+      WORKER_INSTANCE_ID: ${WORKER_INSTANCE_ID:-platform-worker-local}
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,6 +142,23 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/collector.Dockerfile
+    environment:
+      COLLECTOR_HEALTH_LISTEN_ADDRESS: 0.0.0.0:9090
+      COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS: ${COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS:-2000}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:9090/health/ready",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
 volumes:
   postgres-data:

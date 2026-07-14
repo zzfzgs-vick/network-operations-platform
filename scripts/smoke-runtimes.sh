@@ -43,9 +43,43 @@ wait_http() {
   return 1
 }
 
+docker_available() {
+  command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1
+}
+
+export DATABASE_HOST=127.0.0.1
+export DATABASE_PORT=5432
+export DATABASE_NAME=network_operations
+export DATABASE_USER=nop
+export DATABASE_PASSWORD=change-me-local-only
+export DATABASE_SSL_MODE=disable
+export DATABASE_POOL_MAX=10
+export DATABASE_CONNECT_TIMEOUT_MS=5000
+export DATABASE_QUERY_TIMEOUT_MS=10000
+export VICTORIAMETRICS_URL=http://127.0.0.1:8428
+export VMALERT_URL=http://127.0.0.1:8880
+export PLATFORM_HEALTH_TIMEOUT_MS=2000
+export WORKER_HEARTBEAT_INTERVAL_MS=1000
+export WORKER_HEARTBEAT_STALE_AFTER_MS=5000
+export WORKER_INSTANCE_ID=platform-worker-smoke
+
+dependency_health_verified=false
+if docker_available; then
+  npm run test:integration --workspace apps/platform -- platform-health
+  npm run db:migrate --workspace apps/platform
+  dependency_health_verified=true
+  export NODE_ENV=development
+  unset DATABASE_STARTUP_CHECK || true
+else
+  echo "Docker is unavailable; dependency readiness scenarios are covered by the Ubuntu job." >&2
+  export NODE_ENV=test
+  export DATABASE_STARTUP_CHECK=disabled
+fi
+
 web_port="$(free_port)"
 api_port="$(free_port)"
 worker_probe_port="$(free_port)"
+collector_health_port="$(free_port)"
 collector="$root/services/collector/dist/collector"
 
 mkdir -p "$(dirname "$collector")"
@@ -59,22 +93,39 @@ node "$root/node_modules/vite/bin/vite.js" preview "$root/apps/web" \
 web_pid=$!
 pids+=("$web_pid")
 
-NODE_ENV=test DATABASE_STARTUP_CHECK=disabled HOST=127.0.0.1 PORT="$api_port" \
+HOST=127.0.0.1 PORT="$api_port" \
   node "$root/apps/platform/dist/main.js" >"$tmp/api.log" 2>&1 &
 api_pid=$!
 pids+=("$api_pid")
 
-NODE_ENV=test DATABASE_STARTUP_CHECK=disabled PORT="$worker_probe_port" \
+PORT="$worker_probe_port" \
   node "$root/apps/platform/dist/worker.js" >"$tmp/worker.log" 2>&1 &
 worker_pid=$!
 pids+=("$worker_pid")
 
-"$collector" >"$tmp/collector.log" 2>&1 &
+COLLECTOR_HEALTH_LISTEN_ADDRESS="127.0.0.1:$collector_health_port" \
+COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS=2000 \
+  "$collector" >"$tmp/collector.log" 2>&1 &
 collector_pid=$!
 pids+=("$collector_pid")
 
 wait_http "http://127.0.0.1:$web_port" "Network Operations Platform"
 wait_http "http://127.0.0.1:$api_port" '"service":"platform-api"'
+wait_http "http://127.0.0.1:$api_port/health/live" '"status":"ALIVE"'
+wait_http "http://127.0.0.1:$api_port/metrics" "nop_runtime_dependency_available"
+wait_http "http://127.0.0.1:$collector_health_port/health/ready" '"status":"READY"'
+
+if [[ "$dependency_health_verified" == true ]]; then
+  wait_http "http://127.0.0.1:$api_port/health/ready" '"status":"READY"'
+  wait_http "http://127.0.0.1:8428/-/healthy" "OK"
+  wait_http "http://127.0.0.1:8880/-/healthy" "OK"
+  node -e '
+    const socket = require("node:net").connect(5432, "127.0.0.1");
+    socket.once("connect", () => { socket.destroy(); process.exit(0); });
+    socket.once("error", () => process.exit(1));
+    setTimeout(() => process.exit(1), 2000);
+  '
+fi
 
 if node -e '
   const socket = require("node:net").connect(Number(process.argv[1]), "127.0.0.1");
@@ -103,3 +154,6 @@ echo "Web runtime: PASS"
 echo "API runtime: PASS (SIGTERM)"
 echo "Worker runtime: PASS (no listener, SIGTERM)"
 echo "Collector runtime: PASS (version, SIGTERM)"
+if [[ "$dependency_health_verified" == true ]]; then
+  echo "Dependency readiness: PASS (PostgreSQL, VictoriaMetrics, vmalert, Worker heartbeat, failure and recovery)"
+fi

@@ -16,3 +16,7 @@ databases may be recreated. API and Worker startup only run `db:verify` behavior
 
 `0002_reliable_work_foundation.up.sql` owns the T006 Inbox, Outbox, Job, attempt, finite lease,
 and Dead Letter schema. After release it is immutable; corrections use a new forward migration.
+
+`0003_platform_health_foundation.up.sql` owns the bounded Worker heartbeat registry and the
+single-row Inbox duplicate counter used by T007 runtime observability. It does not contain business
+health data.

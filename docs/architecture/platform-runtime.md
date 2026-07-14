@@ -236,6 +236,18 @@ Platform Worker exposes:
 
 Worker unavailability or sustained backlog creates a Platform Alert. The External Availability Check also observes platform-level health that cannot depend entirely on the failed Worker path.
 
+### T007 implementation baseline
+
+The API exposes process-only liveness separately from dependency-aware readiness. Readiness checks
+PostgreSQL schema compatibility, VictoriaMetrics, vmalert, and a PostgreSQL-backed Platform Worker
+heartbeat. The Worker heartbeat uses a stable instance identity and bounded update-in-place record;
+the Worker still has no HTTP listener. Reliable-work metrics read aggregate state and a transactionally
+safe single-row Inbox duplicate counter without labels containing message or request identities.
+
+The Collector owns a small standard-library HTTP health listener with liveness, readiness, and metrics.
+This listener reports only the Collector process lifecycle and does not calculate business Health,
+Alert, Observation, Probe, SNMP, or Trap state.
+
 ## Module structure
 
 The modular monolith keeps API controllers free of background loops, Worker handlers dependent on application services rather than public HTTP, domain logic independent of controllers, and database adapters separated from domain rules.

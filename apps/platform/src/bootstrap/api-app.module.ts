@@ -13,6 +13,7 @@ import type { IncomingMessage } from "node:http";
 import { DatabaseModule } from "../database/database.module.js";
 import { ContractExceptionFilter } from "../http/contract-exception.filter.js";
 import { RequestIdMiddleware, requestIdFrom } from "../http/request-id.js";
+import { PlatformHealthApiModule } from "../modules/platform-health/platform-health.module.js";
 
 @Controller()
 class RuntimeController {
@@ -29,7 +30,7 @@ class RuntimeController {
 }
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, PlatformHealthApiModule],
   controllers: [RuntimeController],
   providers: [{ provide: APP_FILTER, useClass: ContractExceptionFilter }],
 })

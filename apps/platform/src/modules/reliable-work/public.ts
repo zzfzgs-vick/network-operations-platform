@@ -115,6 +115,17 @@ export class ReliableWorkStore {
 
     if (accepted) return { inboxMessageId, accepted } as const;
 
+    await this.pool
+      .query(
+        `
+          update public.reliable_inbox_observability
+          set duplicate_count = duplicate_count + 1,
+              updated_at = clock_timestamp()
+          where singleton
+        `,
+      )
+      .catch(() => undefined);
+
     const existing = await this.pool.query<{ inbox_message_id: string }>(
       `
         select inbox_message_id
