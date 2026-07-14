@@ -40,13 +40,13 @@ wait_http() {
 
   node --input-type=module -e '
     import { setTimeout as delay } from "node:timers/promises";
-    const [url, expected] = process.argv.slice(1);
+    const [url, expected = ""] = process.argv.slice(1);
     const deadline = Date.now() + 20_000;
     while (Date.now() < deadline) {
       try {
         const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
         const body = await response.text();
-        if (body.includes(expected)) process.exit(0);
+        if (response.ok && (!expected || body.includes(expected))) process.exit(0);
       } catch {}
       await delay(100);
     }
@@ -130,8 +130,8 @@ wait_http "http://127.0.0.1:$collector_health_port/health/ready" '"status":"READ
 
 if [[ "$dependency_health_verified" == true ]]; then
   wait_http "http://127.0.0.1:$api_port/health/ready" '"status":"READY"'
-  wait_http "http://127.0.0.1:8428/-/healthy" "OK"
-  wait_http "http://127.0.0.1:8880/-/healthy" "OK"
+  wait_http "http://127.0.0.1:8428/-/healthy" ""
+  wait_http "http://127.0.0.1:8880/-/healthy" ""
   node -e '
     const socket = require("node:net").connect(5432, "127.0.0.1");
     socket.once("connect", () => { socket.destroy(); process.exit(0); });
