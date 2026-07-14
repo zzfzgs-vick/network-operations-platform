@@ -1,7 +1,7 @@
 # T003：本地开发 Docker Compose 基础设施
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 提供仅用于本地开发的 PostgreSQL、VictoriaMetrics 和 vmalert 可重复启动环境及基础镜像构建。

@@ -1,7 +1,13 @@
 # T002：React、NestJS API/Worker 与 Go 最小运行骨架
 
 ## 状态
-READY
+DONE
+
+## 完成记录
+- Windows 本地完整验收：通过，包括根级与 Workspace format/lint/typecheck/test/build、Go test/build 和四运行入口冒烟。
+- Ubuntu GitHub Actions CI：通过，包括 Workspace、Go 和真实 SIGTERM 运行入口冒烟。
+- 对应 Git Commit：`966e3359ee7dcf8ff36cae2a137df658f717db31`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29310211481`，Ubuntu job `87012181720`，Windows job `87012181754`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29310211481>。
 
 ## 目标
 让四个运行入口独立构建、启动、报告版本并优雅停止，不包含业务能力。
