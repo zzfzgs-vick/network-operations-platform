@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
 
-@Module({})
+import { DatabaseModule } from "../database/database.module.js";
+
+@Module({ imports: [DatabaseModule] })
 export class WorkerAppModule {}

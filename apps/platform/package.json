@@ -4,17 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:migrate": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/migrate.js up",
+    "db:status": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/migrate.js status",
+    "db:verify": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/migrate.js verify",
     "start:api": "node dist/main.js",
     "start:worker": "node dist/worker.js",
-    "build": "tsc --project tsconfig.build.json",
-    "test": "tsc --project tsconfig.build.json && node --test dist/runtime.test.js",
+    "build": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js",
+    "test": "tsc --project tsconfig.build.json && node --import ./dist/database/unit-test-setup.js --test dist/runtime.test.js",
+    "test:db": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node ../../scripts/db-test.mjs",
     "typecheck": "tsc --project tsconfig.build.json --noEmit"
   },
   "dependencies": {
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-express": "11.1.28",
+    "pg": "8.22.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.0"
   }
 }

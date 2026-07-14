@@ -1,5 +1,7 @@
 import { Controller, Get, Module } from "@nestjs/common";
 
+import { DatabaseModule } from "../database/database.module.js";
+
 @Controller()
 class RuntimeController {
   @Get()
@@ -11,5 +13,5 @@ class RuntimeController {
   }
 }
 
-@Module({ controllers: [RuntimeController] })
+@Module({ imports: [DatabaseModule], controllers: [RuntimeController] })
 export class ApiAppModule {}

@@ -1,18 +1,29 @@
 name: nop-dev
 
+x-platform-database-environment: &platform-database-environment
+  DATABASE_HOST: postgres
+  DATABASE_PORT: 5432
+  DATABASE_NAME: ${DATABASE_NAME:-network_operations}
+  DATABASE_USER: ${DATABASE_USER:-nop}
+  DATABASE_PASSWORD: ${DATABASE_PASSWORD:-change-me-local-only}
+  DATABASE_SSL_MODE: ${DATABASE_SSL_MODE:-disable}
+  DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+  DATABASE_CONNECT_TIMEOUT_MS: ${DATABASE_CONNECT_TIMEOUT_MS:-5000}
+  DATABASE_QUERY_TIMEOUT_MS: ${DATABASE_QUERY_TIMEOUT_MS:-10000}
+
 services:
   postgres:
     image: postgres:18.4-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-network_operations}
-      POSTGRES_USER: ${POSTGRES_USER:-nop}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+      POSTGRES_DB: ${DATABASE_NAME:-network_operations}
+      POSTGRES_USER: ${DATABASE_USER:-nop}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-change-me-local-only}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${DATABASE_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -29,7 +40,15 @@ services:
     volumes:
       - victoriametrics-data:/victoria-metrics-data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8428/-/healthy"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8428/-/healthy",
+        ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -52,7 +71,15 @@ services:
       victoriametrics:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8880/-/healthy"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8880/-/healthy",
+        ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -74,8 +101,12 @@ services:
       dockerfile: deploy/docker/platform.Dockerfile
     command: ["node", "apps/platform/dist/main.js"]
     environment:
+      <<: *platform-database-environment
       HOST: 0.0.0.0
       PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
 
@@ -85,6 +116,10 @@ services:
       context: ../..
       dockerfile: deploy/docker/platform.Dockerfile
     command: ["node", "apps/platform/dist/worker.js"]
+    environment: *platform-database-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   collector:
     profiles: [application]
