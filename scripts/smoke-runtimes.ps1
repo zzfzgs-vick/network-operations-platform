@@ -80,12 +80,12 @@ function Test-TcpConnection {
 
 function Test-DockerRuntime {
     if (Get-Command docker -ErrorAction SilentlyContinue) {
-        & docker version *> $null
-        return $LASTEXITCODE -eq 0
+        $dockerOs = & docker info --format '{{.OSType}}' 2> $null
+        return $LASTEXITCODE -eq 0 -and $dockerOs.Trim() -eq 'linux'
     }
     if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
-        & wsl.exe -- docker version *> $null
-        return $LASTEXITCODE -eq 0
+        $dockerOs = & wsl.exe -- docker info --format '{{.OSType}}' 2> $null
+        return $LASTEXITCODE -eq 0 -and $dockerOs.Trim() -eq 'linux'
     }
     return $false
 }

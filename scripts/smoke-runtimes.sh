@@ -6,10 +6,20 @@ tmp="$(mktemp -d)"
 pids=()
 
 cleanup() {
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    for log in web api worker collector; do
+      if [[ -f "$tmp/$log.log" ]]; then
+        echo "--- $log runtime log ---" >&2
+        sed -n '1,120p' "$tmp/$log.log" >&2
+      fi
+    done
+  fi
   for pid in "${pids[@]}"; do
     kill -TERM "$pid" 2>/dev/null || true
   done
   rm -rf "$tmp"
+  return "$status"
 }
 trap cleanup EXIT
 
@@ -28,23 +38,26 @@ wait_http() {
   local url="$1"
   local expected="$2"
 
-  for _ in {1..50}; do
-    if node -e '
-      fetch(process.argv[1])
-        .then((response) => response.text())
-        .then((body) => process.exit(body.includes(process.argv[2]) ? 0 : 1))
-        .catch(() => process.exit(1));
-    ' "$url" "$expected"; then
-      return 0
-    fi
-    sleep 0.1
-  done
-
-  return 1
+  node --input-type=module -e '
+    import { setTimeout as delay } from "node:timers/promises";
+    const [url, expected] = process.argv.slice(1);
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
+        const body = await response.text();
+        if (body.includes(expected)) process.exit(0);
+      } catch {}
+      await delay(100);
+    }
+    console.error(`Runtime did not become ready: ${url}`);
+    process.exit(1);
+  ' "$url" "$expected"
 }
 
 docker_available() {
-  command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1
+  command -v docker >/dev/null 2>&1 &&
+    [[ "$(docker info --format '{{.OSType}}' 2>/dev/null)" == "linux" ]]
 }
 
 export DATABASE_HOST=127.0.0.1
