@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { URL } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 
 import { readDatabaseConfig } from "../../../apps/platform/dist/database/config.js";
 import {
@@ -20,6 +20,28 @@ import { createApiApplication } from "../../../apps/platform/dist/main.js";
 import { createWorkerApplication } from "../../../apps/platform/dist/worker.js";
 
 const databaseEnvironment = process.env;
+const repositoryMigrationDirectory = fileURLToPath(
+  new URL("../../../apps/platform/migrations/", import.meta.url),
+);
+const migrationFilePattern = /^(\d{4})_([a-z0-9_]+)\.up\.sql$/;
+const repositoryMigrations = (await readdir(repositoryMigrationDirectory))
+  .map((fileName) => migrationFilePattern.exec(fileName))
+  .filter((match) => match !== null)
+  .map((match) => ({ version: Number(match[1]), name: match[2] }))
+  .sort((left, right) => left.version - right.version);
+const latestRepositoryMigration = repositoryMigrations.at(-1)?.version ?? 0;
+
+async function resetIsolatedTestDatabase(pool) {
+  const result = await pool.query("select current_database() as database_name");
+  const databaseName = result.rows[0]?.database_name;
+
+  if (!/^nop_t004_[a-f0-9]{32}$/.test(databaseName ?? "")) {
+    throw new Error("Refusing to reset a database not created by db-test.mjs");
+  }
+
+  await pool.query("drop schema if exists public cascade");
+  await pool.query("create schema public");
+}
 
 test("complete database environment produces one validated configuration", () => {
   const config = readDatabaseConfig({
@@ -111,8 +133,7 @@ test("migrations apply once and failed migrations remain retryable", async () =>
   );
 
   try {
-    await pool.query("drop table if exists platform_schema_migrations");
-    await pool.query("drop table if exists failed_migration_probe");
+    await resetIsolatedTestDatabase(pool);
     await writeFile(join(fixture, "0001_platform_baseline.up.sql"), baseline);
 
     assert.equal((await applyMigrations(pool, fixture)).appliedCount, 1);
@@ -155,19 +176,35 @@ test("concurrent migration runners serialize one global history", async () => {
   );
 
   try {
-    await firstPool.query("drop table if exists platform_schema_migrations");
+    await resetIsolatedTestDatabase(firstPool);
     const results = await Promise.all([
       applyMigrations(firstPool),
       applyMigrations(secondPool),
     ]);
+    assert.deepEqual(results.map((result) => result.appliedCount).sort(), [
+      0,
+      repositoryMigrations.length,
+    ]);
+    const history = await firstPool.query(
+      `
+        select version, name, length(checksum)::integer as checksum_length
+        from public.platform_schema_migrations
+        order by version
+      `,
+    );
     assert.deepEqual(
-      results.map((result) => result.appliedCount).sort(),
-      [0, 1],
+      history.rows,
+      repositoryMigrations.map((migration) => ({
+        ...migration,
+        checksum_length: 64,
+      })),
     );
-    const count = await firstPool.query(
-      "select count(*)::integer as count from platform_schema_migrations",
-    );
-    assert.equal(count.rows[0].count, 1);
+    assert.deepEqual(await getMigrationStatus(firstPool), {
+      currentVersion: latestRepositoryMigration,
+      latestVersion: latestRepositoryMigration,
+      pendingVersions: [],
+      compatible: true,
+    });
   } finally {
     await firstPool.end();
     await secondPool.end();
@@ -178,7 +215,7 @@ test("changed applied migrations are reported as incompatible", async () => {
   const pool = createDatabasePool(readDatabaseConfig(databaseEnvironment));
 
   try {
-    await pool.query("drop table if exists platform_schema_migrations");
+    await resetIsolatedTestDatabase(pool);
     await applyMigrations(pool);
     await pool.query(
       "update platform_schema_migrations set checksum = 'changed'",
@@ -197,7 +234,7 @@ test("API and Worker verify one schema contract with independent closeable pools
   const controlPool = createDatabasePool(
     readDatabaseConfig(databaseEnvironment),
   );
-  await controlPool.query("drop table if exists platform_schema_migrations");
+  await resetIsolatedTestDatabase(controlPool);
   await applyMigrations(controlPool);
 
   const api = await createApiApplication();
@@ -211,8 +248,8 @@ test("API and Worker verify one schema contract with independent closeable pools
     assert.deepEqual(apiDatabase.status, {
       connected: true,
       compatible: true,
-      currentVersion: 1,
-      latestVersion: 1,
+      currentVersion: latestRepositoryMigration,
+      latestVersion: latestRepositoryMigration,
     });
     assert.deepEqual(workerDatabase.status, apiDatabase.status);
   } finally {
@@ -229,7 +266,7 @@ test("application startup rejects an empty schema without auto-migrating it", as
   const controlPool = createDatabasePool(
     readDatabaseConfig(databaseEnvironment),
   );
-  await controlPool.query("drop table if exists platform_schema_migrations");
+  await resetIsolatedTestDatabase(controlPool);
   const api = await createApiApplication();
 
   try {
@@ -273,7 +310,7 @@ test("migration history remains in public when search_path changes", async () =>
   );
 
   try {
-    await pool.query("drop table if exists public.platform_schema_migrations");
+    await resetIsolatedTestDatabase(pool);
     await pool.query("drop schema if exists migration_shadow cascade");
     await pool.query("create schema migration_shadow");
     await pool.query(`
@@ -286,14 +323,17 @@ test("migration history remains in public when search_path changes", async () =>
     `);
     await pool.query("set search_path to migration_shadow, public");
 
-    assert.equal((await applyMigrations(pool)).appliedCount, 1);
+    assert.equal(
+      (await applyMigrations(pool)).appliedCount,
+      repositoryMigrations.length,
+    );
     const publicCount = await pool.query(
       "select count(*)::integer as count from public.platform_schema_migrations",
     );
     const shadowCount = await pool.query(
       "select count(*)::integer as count from migration_shadow.platform_schema_migrations",
     );
-    assert.equal(publicCount.rows[0].count, 1);
+    assert.equal(publicCount.rows[0].count, repositoryMigrations.length);
     assert.equal(shadowCount.rows[0].count, 0);
   } finally {
     await pool.query("reset search_path").catch(() => undefined);
