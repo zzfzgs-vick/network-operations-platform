@@ -1,0 +1,103 @@
+name: nop-dev
+
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-network_operations}
+      POSTGRES_USER: ${POSTGRES_USER:-nop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.147.0
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -retentionPeriod=90d
+    ports:
+      - "127.0.0.1:${VICTORIAMETRICS_PORT:-8428}:8428"
+    volumes:
+      - victoriametrics-data:/victoria-metrics-data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8428/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  vmalert:
+    image: victoriametrics/vmalert:v1.147.0
+    command:
+      - -datasource.url=http://victoriametrics:8428
+      - -remoteRead.url=http://victoriametrics:8428
+      - -remoteWrite.url=http://victoriametrics:8428
+      - -rule=/etc/vmalert/rules/*.yml
+      - -httpListenAddr=:8880
+    ports:
+      - "127.0.0.1:${VMALERT_PORT:-8880}:8880"
+    volumes:
+      - ../vmalert/rules:/etc/vmalert/rules:ro
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8880/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    profiles: [application]
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+    ports:
+      - "127.0.0.1:${WEB_PORT:-4173}:4173"
+
+  api:
+    profiles: [application]
+    build:
+      context: ../..
+      dockerfile: deploy/docker/platform.Dockerfile
+    command: ["node", "apps/platform/dist/main.js"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+
+  worker:
+    profiles: [application]
+    build:
+      context: ../..
+      dockerfile: deploy/docker/platform.Dockerfile
+    command: ["node", "apps/platform/dist/worker.js"]
+
+  collector:
+    profiles: [application]
+    build:
+      context: ../..
+      dockerfile: deploy/docker/collector.Dockerfile
+
+volumes:
+  postgres-data:
+    name: nop-dev-postgres-data
+  victoriametrics-data:
+    name: nop-dev-victoriametrics-data
+
+networks:
+  default:
+    name: nop-dev

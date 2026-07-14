@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+*.log
+*.out
+*.test
+apps
+coverage
+docs
+node_modules
+packages
