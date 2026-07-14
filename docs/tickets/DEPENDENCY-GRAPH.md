@@ -12,8 +12,8 @@ flowchart TD
   end
   subgraph P1["Phase 1 运行基础设施"]
     T003["T003 DONE · 本地 Compose 基础设施"]
-    T004["T004 READY · 迁移与数据库访问基线"]
-    T005["T005 共享协议与生成防漂移"]
+    T004["T004 DONE · 迁移与数据库访问基线"]
+    T005["T005 READY · 共享协议与生成防漂移"]
     T006["T006 PostgreSQL 可靠工作纵切"]
     T007["T007 平台可观测性基线"]
     T008["T008 配置、Secret 与服务认证"]
@@ -244,7 +244,7 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001～T003 已完成，当前先执行 T004；T005 保持 PLANNED，后续仍可按依赖并行推进。
+- T001～T004 已完成，当前先执行 T005；T006 在 T005 完成后具备全部前置。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
@@ -253,7 +253,7 @@ flowchart TD
 
 ## 当前首个可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)、[T002：最小运行骨架](T002-minimal-runtime-skeletons.md) 和 [T003：本地 Compose 基础设施](T003-local-compose-infrastructure.md) 已为 DONE。[T004：PostgreSQL 迁移与数据库访问基线](T004-postgres-migration-data-access-baseline.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T004：PostgreSQL 迁移与数据库访问基线](T004-postgres-migration-data-access-baseline.md) 已为 DONE。[T005：共享协议、错误模型与生成物防漂移](T005-shared-contracts-error-model.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
 
 ## DAG 检查规则
 

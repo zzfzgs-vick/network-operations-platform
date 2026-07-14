@@ -2,7 +2,14 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- Windows 11 本地质量、迁移、真实 PostgreSQL 18.4 集成及 runtime smoke 验收：通过。
+- WSL Ubuntu 24.04 本地质量、构建和真实 PostgreSQL 18.4 集成验收：通过。
+- 对应 Git Commits：实现 `fcac2ab747c243eff69b6732cef171e60c9a816a`；CI runtime smoke 兼容修正 `45fe67970d0ad149ba473d4a11243d3cd730c774`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29324289212`，Ubuntu job `87056748058`，Windows job `87056748068`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29324289212>。
 
 ## 目标
 

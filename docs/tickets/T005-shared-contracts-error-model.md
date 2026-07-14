@@ -1,7 +1,7 @@
 # T005：共享协议、错误模型与生成物防漂移
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 建立跨 Web、NestJS 和 Go 的最小权威合同与生成检查。
@@ -71,4 +71,3 @@ PLANNED
 ## 后续 Ticket
 - [T006](T006-postgres-reliable-work-tracer.md)
 - T025
-
