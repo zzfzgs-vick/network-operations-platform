@@ -2,7 +2,14 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- Windows 11 本地质量、契约、HTTP 边界、生成防漂移及 Docker/WSL 镜像验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `643671535b69a6de752cf1947367b90e1a8e927e`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29334228168`，Ubuntu job `87089357116`，Windows job `87089357182`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29334228168>。
 
 ## 目标
 
