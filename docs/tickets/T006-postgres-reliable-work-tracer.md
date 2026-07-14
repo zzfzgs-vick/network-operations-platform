@@ -1,7 +1,14 @@
 # T006：Inbox、Outbox、Job Queue 最小可靠纵向切片
 
 ## 状态
-READY
+DONE
+
+## 完成记录
+
+- Windows 11 本地质量、迁移、真实 PostgreSQL 18.4 集成及并发验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `ca5353bf0d13b87bab4ac3ac03ab8d391e3cf12d`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29339977731`，Ubuntu job `87108853989`，Windows job `87108853964`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29339977731>。
 
 ## 目标
 用一条无业务含义的测试消息证明 PostgreSQL 至少一次、幂等、租约、重试和 Dead Letter 路径。

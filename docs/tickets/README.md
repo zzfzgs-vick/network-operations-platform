@@ -13,7 +13,7 @@
 - `DONE`
 - `SUPERSEDED`
 
-仅当前置 Ticket 全部 `DONE` 后才可把 Ticket 改为 `READY`。[T001](T001-cross-platform-monorepo-quality-baseline.md)～[T005](T005-shared-contracts-error-model.md) 已为 `DONE`；当前唯一 `READY` Ticket 是 [T006](T006-postgres-reliable-work-tracer.md)。Ticket 编号永久保留，不复用；完成后可保持原位，确需归档时移入 `completed/`，不改变编号或文件名。
+仅当前置 Ticket 全部 `DONE` 后才可把 Ticket 改为 `READY`。[T001](T001-cross-platform-monorepo-quality-baseline.md)～[T006](T006-postgres-reliable-work-tracer.md) 已为 `DONE`；当前唯一 `READY` Ticket 是 [T007](T007-platform-observability-health-baseline.md)。Ticket 编号永久保留，不复用；完成后可保持原位，确需归档时移入 `completed/`，不改变编号或文件名。
 
 ## 工作规则
 
