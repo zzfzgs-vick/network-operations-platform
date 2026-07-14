@@ -1,0 +1,56 @@
+# Version control and local environment
+.git
+.git/**
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated build output
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+*.tsbuildinfo
+**/*.tsbuildinfo
+.vite
+**/.vite
+
+# Caches and test output
+.tmp
+**/.tmp
+.cache
+**/.cache
+test-results
+**/test-results
+playwright-report
+**/playwright-report
+*.pid
+*.log
+npm-debug.log*
+
+# Secrets and private key material
+*.key
+*.pem
+*.pfx
+*.p12
+*.crt
+*.cer
+secrets
+secrets/**
+
+# Editor and operating-system files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN
+*.tmp
+*.bak
+*.swp
+*.swo
+*~

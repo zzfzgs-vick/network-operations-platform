@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "files": [
+    "generated/typescript/index.d.ts",
+    "../../tests/contract/typescript-contract.typecheck.ts"
+  ]
+}

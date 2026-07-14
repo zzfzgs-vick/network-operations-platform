@@ -38,13 +38,91 @@ test("API listens and reports its runtime identity", async () => {
 
   try {
     await app.listen(0, "127.0.0.1");
-    const response = await fetch(await app.getUrl());
+    const response = await fetch(await app.getUrl(), {
+      headers: { "x-request-id": "runtime-test-1" },
+    });
 
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-request-id"), "runtime-test-1");
     assert.deepEqual(await response.json(), {
+      contractVersion: "v1",
       service: "platform-api",
+      status: "READY",
       version: "dev",
+      requestId: "runtime-test-1",
     });
+  } finally {
+    await app.close();
+  }
+});
+
+test("API returns a correlated safe contract for unknown routes", async () => {
+  const app = await createApiApplication();
+
+  try {
+    await app.listen(0, "127.0.0.1");
+    const response = await fetch(`${await app.getUrl()}/missing`, {
+      headers: { "x-request-id": "missing-route-1" },
+    });
+
+    assert.equal(response.status, 404);
+    assert.match(
+      response.headers.get("content-type") ?? "",
+      /application\/json/,
+    );
+    assert.equal(response.headers.get("x-request-id"), "missing-route-1");
+    assert.deepEqual(await response.json(), {
+      contractVersion: "v1",
+      error: {
+        code: "PLATFORM_NOT_FOUND",
+        message: "The requested resource was not found",
+        requestId: "missing-route-1",
+        retryable: false,
+      },
+    });
+  } finally {
+    await app.close();
+  }
+});
+
+test("API replaces an invalid inbound request ID", async () => {
+  const app = await createApiApplication();
+
+  try {
+    await app.listen(0, "127.0.0.1");
+    const response = await fetch(await app.getUrl(), {
+      headers: { "x-request-id": "invalid request id" },
+    });
+    const requestId = response.headers.get("x-request-id");
+
+    assert.ok(requestId);
+    assert.notEqual(requestId, "invalid request id");
+    assert.match(requestId, /^[0-9a-f-]{36}$/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("API correlates errors raised before route middleware", async () => {
+  const app = await createApiApplication();
+
+  try {
+    await app.listen(0, "127.0.0.1");
+    const response = await fetch(await app.getUrl(), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "early-parser-error-1",
+      },
+      body: "{",
+    });
+    const body = (await response.json()) as {
+      error: { requestId?: string };
+    };
+
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get("x-request-id"), "early-parser-error-1");
+    assert.equal(response.headers.get("x-request-id"), body.error.requestId);
   } finally {
     await app.close();
   }

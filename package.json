@@ -12,12 +12,16 @@
     "packages/*"
   ],
   "scripts": {
+    "contracts:generate": "node scripts/contracts-generate.mjs",
+    "contracts:check": "node scripts/contracts-check.mjs",
+    "test:contract": "node scripts/contracts-test.mjs",
+    "test:contract:docker": "node scripts/contracts-docker-test.mjs",
     "format:check": "prettier --check --ignore-unknown package.json tsconfig.json eslint.config.mjs scripts .github README.md",
     "lint": "eslint .",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "node --test scripts/workspace-baseline.test.ts",
     "build": "tsc --project tsconfig.json",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
+    "verify": "npm run contracts:check && npm run test:contract && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

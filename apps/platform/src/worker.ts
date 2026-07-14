@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
+import { CONTRACT_VERSION } from "@nop/contracts";
 import { pathToFileURL } from "node:url";
 
 import { WorkerAppModule } from "./bootstrap/worker-app.module.js";
@@ -13,7 +14,9 @@ export async function createWorkerApplication() {
 async function startWorker() {
   const app = await createWorkerApplication();
   const version = process.env.APP_VERSION ?? "dev";
-  console.info(`platform-worker started version=${version}`);
+  console.info(
+    `platform-worker started version=${version} contractVersion=${CONTRACT_VERSION}`,
+  );
 
   const signal = await waitForShutdown();
   console.info(`platform-worker stopping signal=${signal}`);

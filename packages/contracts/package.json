@@ -1,0 +1,17 @@
+{
+  "name": "@nop/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./generated/typescript/index.d.ts",
+      "default": "./generated/typescript/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node -e \"import('./generated/typescript/index.js')\"",
+    "test": "node --test ../../tests/contract/contracts.test.mjs",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
+}

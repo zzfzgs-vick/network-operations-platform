@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nop:contracts:v1",
+  "title": "Network Operations Platform base contracts",
+  "$defs": {
+    "ContractVersion": {
+      "type": "string",
+      "const": "v1"
+    },
+    "RequestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "CorrelationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "StableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "UtcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "ErrorCode": {
+      "oneOf": [
+        {
+          "const": "PLATFORM_VALIDATION_FAILED",
+          "x-http-status": 400,
+          "x-retryable": false,
+          "x-default-message": "Request validation failed"
+        },
+        {
+          "const": "PLATFORM_UNAUTHENTICATED",
+          "x-http-status": 401,
+          "x-retryable": false,
+          "x-default-message": "Authentication is required"
+        },
+        {
+          "const": "PLATFORM_FORBIDDEN",
+          "x-http-status": 403,
+          "x-retryable": false,
+          "x-default-message": "Access is forbidden"
+        },
+        {
+          "const": "PLATFORM_NOT_FOUND",
+          "x-http-status": 404,
+          "x-retryable": false,
+          "x-default-message": "The requested resource was not found"
+        },
+        {
+          "const": "PLATFORM_CONFLICT",
+          "x-http-status": 409,
+          "x-retryable": false,
+          "x-default-message": "The request conflicts with current state"
+        },
+        {
+          "const": "PLATFORM_RATE_LIMITED",
+          "x-http-status": 429,
+          "x-retryable": true,
+          "x-default-message": "Too many requests"
+        },
+        {
+          "const": "PLATFORM_UNAVAILABLE",
+          "x-http-status": 503,
+          "x-retryable": true,
+          "x-default-message": "The service is temporarily unavailable"
+        },
+        {
+          "const": "PLATFORM_INTERNAL_ERROR",
+          "x-http-status": 500,
+          "x-retryable": false,
+          "x-default-message": "An internal error occurred"
+        }
+      ]
+    },
+    "ErrorDetail": {
+      "type": "object",
+      "required": ["key", "value"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "value": { "type": "string", "maxLength": 256 }
+      },
+      "additionalProperties": true
+    },
+    "FieldError": {
+      "type": "object",
+      "required": ["field", "message"],
+      "properties": {
+        "field": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": true
+    },
+    "PlatformError": {
+      "type": "object",
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "$ref": "#/$defs/ErrorCode" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "retryable": { "type": "boolean" },
+        "requestId": { "$ref": "#/$defs/RequestId" },
+        "details": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/ErrorDetail" }
+        },
+        "fieldErrors": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/FieldError" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "required": ["contractVersion", "error"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/ContractVersion" },
+        "error": { "$ref": "#/$defs/PlatformError" }
+      },
+      "additionalProperties": true
+    },
+    "RuntimeHealthStatus": {
+      "type": "string",
+      "enum": ["READY", "NOT_READY"]
+    },
+    "RuntimeHealthResponse": {
+      "type": "object",
+      "required": ["contractVersion", "service", "version", "status"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/ContractVersion" },
+        "service": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "status": { "$ref": "#/$defs/RuntimeHealthStatus" },
+        "requestId": { "$ref": "#/$defs/RequestId" }
+      },
+      "additionalProperties": true
+    },
+    "FailureClassification": {
+      "type": "string",
+      "enum": [
+        "TRANSIENT",
+        "PERMANENT",
+        "VALIDATION",
+        "VERSION_MISMATCH",
+        "UNAVAILABLE",
+        "UNKNOWN"
+      ]
+    },
+    "InternalFailure": {
+      "type": "object",
+      "required": ["classification", "code", "message", "retryable"],
+      "properties": {
+        "classification": { "$ref": "#/$defs/FailureClassification" },
+        "code": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "retryable": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "InternalBatchItemEnvelope": {
+      "type": "object",
+      "required": ["itemId", "observedAt"],
+      "properties": {
+        "itemId": { "$ref": "#/$defs/StableId" },
+        "correlationId": { "$ref": "#/$defs/CorrelationId" },
+        "observedAt": { "$ref": "#/$defs/UtcTimestamp" },
+        "failure": { "$ref": "#/$defs/InternalFailure" }
+      },
+      "additionalProperties": true
+    },
+    "InternalBatchEnvelope": {
+      "type": "object",
+      "required": [
+        "protocolVersion",
+        "sourceId",
+        "batchId",
+        "submittedAt",
+        "items"
+      ],
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/ContractVersion" },
+        "sourceId": { "$ref": "#/$defs/StableId" },
+        "batchId": { "$ref": "#/$defs/StableId" },
+        "submittedAt": { "$ref": "#/$defs/UtcTimestamp" },
+        "items": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/InternalBatchItemEnvelope" }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

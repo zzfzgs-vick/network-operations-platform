@@ -9,4 +9,5 @@ test("renders the platform runtime identity", () => {
 
   assert.match(html, /Network Operations Platform/);
   assert.match(html, /Web runtime version=dev/);
+  assert.match(html, /data-contract-version="v1"/);
 });
