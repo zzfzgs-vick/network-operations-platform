@@ -128,15 +128,19 @@ try {
     $api = Start-RuntimeProcess -FilePath $node -ArgumentList @(
         (Join-Path $platformDirectory 'dist/main.js')
     ) -WorkingDirectory $platformDirectory -Environment @{
-        HOST = '127.0.0.1'
-        PORT = [string] $apiPort
+        NODE_ENV               = 'test'
+        DATABASE_STARTUP_CHECK = 'disabled'
+        HOST                   = '127.0.0.1'
+        PORT                   = [string] $apiPort
     }
     $processes.Add($api)
 
     $worker = Start-RuntimeProcess -FilePath $node -ArgumentList @(
         (Join-Path $platformDirectory 'dist/worker.js')
     ) -WorkingDirectory $platformDirectory -Environment @{
-        PORT = [string] $workerProbePort
+        NODE_ENV               = 'test'
+        DATABASE_STARTUP_CHECK = 'disabled'
+        PORT                   = [string] $workerProbePort
     }
     $processes.Add($worker)
 

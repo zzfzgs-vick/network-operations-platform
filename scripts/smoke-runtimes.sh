@@ -59,12 +59,12 @@ node "$root/node_modules/vite/bin/vite.js" preview "$root/apps/web" \
 web_pid=$!
 pids+=("$web_pid")
 
-HOST=127.0.0.1 PORT="$api_port" \
+NODE_ENV=test DATABASE_STARTUP_CHECK=disabled HOST=127.0.0.1 PORT="$api_port" \
   node "$root/apps/platform/dist/main.js" >"$tmp/api.log" 2>&1 &
 api_pid=$!
 pids+=("$api_pid")
 
-PORT="$worker_probe_port" \
+NODE_ENV=test DATABASE_STARTUP_CHECK=disabled PORT="$worker_probe_port" \
   node "$root/apps/platform/dist/worker.js" >"$tmp/worker.log" 2>&1 &
 worker_pid=$!
 pids+=("$worker_pid")
