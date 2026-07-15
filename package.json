@@ -20,6 +20,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "node --test scripts/workspace-baseline.test.ts",
+    "test:recovery": "npm run build --workspace @nop/platform && node tests/recovery/runtime/run.mjs",
     "build": "tsc --project tsconfig.json",
     "verify": "npm run contracts:check && npm run test:contract && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
   },

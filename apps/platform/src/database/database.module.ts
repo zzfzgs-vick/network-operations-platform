@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   Module,
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
@@ -28,6 +29,7 @@ function databaseStartupCheckIsDisabledForUnitTests() {
 export class DatabaseService
   implements OnApplicationBootstrap, OnApplicationShutdown
 {
+  private readonly logger = new Logger(DatabaseService.name);
   private poolValue: Pool | undefined;
   private statusValue: DatabaseStatus = {
     connected: false,
@@ -54,18 +56,36 @@ export class DatabaseService
 
     const pool = createDatabasePool(readDatabaseConfig());
     this.poolValue = pool;
+    pool.on("error", () => {
+      this.statusValue = { ...this.statusValue, connected: false };
+      this.logger.error("PostgreSQL connection became unavailable");
+    });
 
     try {
-      await pool.query("select 1");
-      const migration = await verifyMigrations(pool);
-      this.statusValue = {
-        connected: true,
-        compatible: migration.compatible,
-        currentVersion: migration.currentVersion,
-        latestVersion: migration.latestVersion,
-      };
+      await this.checkReadiness();
     } catch (error) {
       await pool.end();
+      throw error;
+    }
+  }
+
+  async checkReadiness() {
+    try {
+      await this.pool.query("select 1");
+      if (!this.statusValue.compatible) {
+        const migration = await verifyMigrations(this.pool);
+        this.statusValue = {
+          connected: true,
+          compatible: migration.compatible,
+          currentVersion: migration.currentVersion,
+          latestVersion: migration.latestVersion,
+        };
+      } else {
+        this.statusValue = { ...this.statusValue, connected: true };
+      }
+      return this.statusValue.compatible;
+    } catch (error) {
+      this.statusValue = { ...this.statusValue, connected: false };
       throw error;
     }
   }

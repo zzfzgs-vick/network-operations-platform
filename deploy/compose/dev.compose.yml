@@ -1,6 +1,7 @@
-name: nop-dev
+name: ${COMPOSE_PROJECT_NAME:-nop-dev}
 
 x-platform-database-environment: &platform-database-environment
+  NODE_ENV: development
   DATABASE_HOST: postgres
   DATABASE_PORT: 5432
   DATABASE_NAME: ${DATABASE_NAME:-network_operations}
@@ -29,6 +30,8 @@ services:
       retries: 20
       start_period: 10s
     restart: unless-stopped
+    cpus: 2.0
+    mem_limit: 4g
 
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.147.0
@@ -54,6 +57,8 @@ services:
       retries: 20
       start_period: 10s
     restart: unless-stopped
+    cpus: 4.0
+    mem_limit: 8g
 
   vmalert:
     image: victoriametrics/vmalert:v1.147.0
@@ -85,6 +90,8 @@ services:
       retries: 20
       start_period: 10s
     restart: unless-stopped
+    cpus: 1.0
+    mem_limit: 512m
 
   web:
     profiles: [application]
@@ -93,9 +100,42 @@ services:
       dockerfile: deploy/docker/web.Dockerfile
     ports:
       - "127.0.0.1:${WEB_PORT:-4173}:4173"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4173').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    stop_grace_period: 10s
+    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 256m
+
+  migrate:
+    profiles: [application]
+    image: ${PLATFORM_IMAGE:-nop-platform:dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/platform.Dockerfile
+    command: ["node", "apps/platform/dist/migrate.js", "up"]
+    environment:
+      <<: *platform-database-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    cpus: 1.0
+    mem_limit: 512m
 
   api:
     profiles: [application]
+    image: ${PLATFORM_IMAGE:-nop-platform:dev}
     build:
       context: ../..
       dockerfile: deploy/docker/platform.Dockerfile
@@ -109,6 +149,9 @@ services:
       PLATFORM_HEALTH_TIMEOUT_MS: ${PLATFORM_HEALTH_TIMEOUT_MS:-2000}
       WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
       WORKER_HEARTBEAT_STALE_AFTER_MS: ${WORKER_HEARTBEAT_STALE_AFTER_MS:-15000}
+      API_DRAIN_TIMEOUT_MS: ${API_DRAIN_TIMEOUT_MS:-5000}
+      API_SHUTDOWN_TIMEOUT_MS: ${API_SHUTDOWN_TIMEOUT_MS:-15000}
+      WORKER_SHUTDOWN_TIMEOUT_MS: ${WORKER_SHUTDOWN_TIMEOUT_MS:-15000}
       # Loopback/local development placeholders only. Production uses *_FILE.
       COLLECTOR_SERVICE_TOKEN: ${COLLECTOR_SERVICE_TOKEN:-t008-local-development-only-collector-token}
       VMALERT_SERVICE_TOKEN: ${VMALERT_SERVICE_TOKEN:-t008-local-development-only-vmalert-token}
@@ -119,11 +162,30 @@ services:
         condition: service_healthy
       vmalert:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 20s
+    restart: unless-stopped
+    cpus: 2.0
+    mem_limit: 1g
 
   worker:
     profiles: [application]
+    image: ${PLATFORM_IMAGE:-nop-platform:dev}
     build:
       context: ../..
       dockerfile: deploy/docker/platform.Dockerfile
@@ -136,9 +198,18 @@ services:
       WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
       WORKER_HEARTBEAT_STALE_AFTER_MS: ${WORKER_HEARTBEAT_STALE_AFTER_MS:-15000}
       WORKER_INSTANCE_ID: ${WORKER_INSTANCE_ID:-platform-worker-local}
+      API_DRAIN_TIMEOUT_MS: ${API_DRAIN_TIMEOUT_MS:-5000}
+      API_SHUTDOWN_TIMEOUT_MS: ${API_SHUTDOWN_TIMEOUT_MS:-15000}
+      WORKER_SHUTDOWN_TIMEOUT_MS: ${WORKER_SHUTDOWN_TIMEOUT_MS:-15000}
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 20s
+    restart: unless-stopped
+    cpus: 4.0
+    mem_limit: 2g
 
   collector:
     profiles: [application]
@@ -164,13 +235,17 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    stop_grace_period: 10s
+    restart: unless-stopped
+    cpus: 4.0
+    mem_limit: 1g
 
 volumes:
   postgres-data:
-    name: nop-dev-postgres-data
+    name: ${COMPOSE_PROJECT_NAME:-nop-dev}-postgres-data
   victoriametrics-data:
-    name: nop-dev-victoriametrics-data
+    name: ${COMPOSE_PROJECT_NAME:-nop-dev}-victoriametrics-data
 
 networks:
   default:
-    name: nop-dev
+    name: ${COMPOSE_PROJECT_NAME:-nop-dev}

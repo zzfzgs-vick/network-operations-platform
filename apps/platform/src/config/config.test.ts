@@ -10,6 +10,7 @@ import { readDatabaseConfig } from "../database/config.js";
 import {
   readApiListenConfig,
   readRuntimeHealthConfig,
+  readRuntimeShutdownConfig,
   readSecret,
   safeConfigurationSummary,
   SecretValue,
@@ -143,6 +144,26 @@ test("config validates listen, URL, timeout, and heartbeat relationships", () =>
         WORKER_HEARTBEAT_STALE_AFTER_MS: "5000",
       }),
     /WORKER_HEARTBEAT_STALE_AFTER_MS must exceed WORKER_HEARTBEAT_INTERVAL_MS/,
+  );
+});
+
+test("config bounds runtime shutdown and keeps forced shutdown after drain", () => {
+  assert.deepEqual(readRuntimeShutdownConfig({}), {
+    apiDrainTimeoutMs: 5000,
+    apiShutdownTimeoutMs: 15000,
+    workerShutdownTimeoutMs: 15000,
+  });
+  assert.throws(
+    () => readRuntimeShutdownConfig({ API_DRAIN_TIMEOUT_MS: "0" }),
+    /API_DRAIN_TIMEOUT_MS must be an integer between 1 and 60000/,
+  );
+  assert.throws(
+    () =>
+      readRuntimeShutdownConfig({
+        API_DRAIN_TIMEOUT_MS: "10000",
+        API_SHUTDOWN_TIMEOUT_MS: "5000",
+      }),
+    /API_SHUTDOWN_TIMEOUT_MS must not be shorter than API_DRAIN_TIMEOUT_MS/,
   );
 });
 

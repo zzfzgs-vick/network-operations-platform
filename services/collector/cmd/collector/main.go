@@ -54,6 +54,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		}
 	}
 
+	server.BeginDrain()
 	shutdownContext, cancel := context.WithTimeout(context.Background(), configuration.HealthShutdownTimeout)
 	defer cancel()
 	if err := server.Shutdown(shutdownContext); err != nil {

@@ -330,6 +330,47 @@ export function readRuntimeHealthConfig(
   };
 }
 
+export interface RuntimeShutdownConfig {
+  readonly apiDrainTimeoutMs: number;
+  readonly apiShutdownTimeoutMs: number;
+  readonly workerShutdownTimeoutMs: number;
+}
+
+export function readRuntimeShutdownConfig(
+  environment: Environment = process.env,
+): RuntimeShutdownConfig {
+  const apiDrainTimeoutMs = integer(
+    environment,
+    "API_DRAIN_TIMEOUT_MS",
+    5000,
+    1,
+    60000,
+  );
+  const apiShutdownTimeoutMs = integer(
+    environment,
+    "API_SHUTDOWN_TIMEOUT_MS",
+    15000,
+    1,
+    120000,
+  );
+  if (apiShutdownTimeoutMs < apiDrainTimeoutMs) {
+    throw new Error(
+      "API_SHUTDOWN_TIMEOUT_MS must not be shorter than API_DRAIN_TIMEOUT_MS",
+    );
+  }
+  return {
+    apiDrainTimeoutMs,
+    apiShutdownTimeoutMs,
+    workerShutdownTimeoutMs: integer(
+      environment,
+      "WORKER_SHUTDOWN_TIMEOUT_MS",
+      15000,
+      1,
+      120000,
+    ),
+  };
+}
+
 export function safeConfigurationSummary(
   environment: Environment = process.env,
 ) {
@@ -337,6 +378,7 @@ export function safeConfigurationSummary(
   const database = readPlatformDatabaseConfig(environment);
   const health = readRuntimeHealthConfig(environment);
   const runtime = readRuntimeIdentityConfig(environment);
+  const shutdown = readRuntimeShutdownConfig(environment);
   return {
     environment: runtimeEnvironment(environment),
     version: runtime.version,
@@ -360,6 +402,7 @@ export function safeConfigurationSummary(
       heartbeatStaleAfterMs: health.heartbeatStaleAfterMs,
       workerInstanceId: health.workerInstanceId,
     },
+    shutdown,
   };
 }
 

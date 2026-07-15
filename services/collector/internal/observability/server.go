@@ -40,8 +40,8 @@ func Start(address, version string) (*Server, error) {
 		version:   version,
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health/live", server.health("ALIVE"))
-	mux.HandleFunc("GET /health/ready", server.health("READY"))
+	mux.HandleFunc("GET /health/live", server.health("ALIVE", false))
+	mux.HandleFunc("GET /health/ready", server.health("READY", true))
 	mux.HandleFunc("GET /metrics", server.metrics)
 	server.httpServer = &http.Server{
 		Handler:           mux,
@@ -67,17 +67,21 @@ func (server *Server) Done() <-chan error {
 	return server.done
 }
 
-func (server *Server) Shutdown(ctx context.Context) error {
+func (server *Server) BeginDrain() {
 	server.ready.Store(false)
+}
+
+func (server *Server) Shutdown(ctx context.Context) error {
+	server.BeginDrain()
 	return server.httpServer.Shutdown(ctx)
 }
 
-func (server *Server) health(readyStatus string) http.HandlerFunc {
+func (server *Server) health(readyStatus string, requiresReadiness bool) http.HandlerFunc {
 	return func(response http.ResponseWriter, _ *http.Request) {
 		response.Header().Set("Content-Type", "application/json")
 		status := readyStatus
 		code := http.StatusOK
-		if !server.ready.Load() {
+		if requiresReadiness && !server.ready.Load() {
 			status = "NOT_READY"
 			code = http.StatusServiceUnavailable
 		}

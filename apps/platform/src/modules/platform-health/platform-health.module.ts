@@ -25,6 +25,7 @@ import {
   DatabaseModule,
   DatabaseService,
 } from "../../database/database.module.js";
+import { RuntimeLifecycle } from "../../lifecycle.js";
 import {
   PlatformHealthStore,
   type ReliableWorkMetrics,
@@ -77,15 +78,21 @@ class RuntimeHealthService {
   private readonly config = readRuntimeHealthConfig();
   private readonly lastSuccess = new Map<DependencyName, string>();
 
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly lifecycle: RuntimeLifecycle,
+  ) {}
+
+  get lifecycleState() {
+    return this.lifecycle.state;
+  }
 
   private get store() {
     return new PlatformHealthStore(this.database.pool);
   }
 
   private async checkPostgreSql(): Promise<DependencyStatus> {
-    await this.database.pool.query("select 1");
-    return this.database.status.compatible ? "AVAILABLE" : "UNAVAILABLE";
+    return (await this.database.checkReadiness()) ? "AVAILABLE" : "UNAVAILABLE";
   }
 
   private async checkHttp(url: URL): Promise<DependencyStatus> {
@@ -108,7 +115,17 @@ class RuntimeHealthService {
     operation: () => Promise<DependencyStatus | WorkerHeartbeatStatus>,
   ): Promise<DependencyHealth> {
     try {
-      const result = await operation();
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("dependency health check timed out")),
+          this.config.timeoutMs,
+        );
+        timer.unref();
+      });
+      const result = await Promise.race([operation(), timeout]).finally(() => {
+        if (timer) clearTimeout(timer);
+      });
       const status = typeof result === "string" ? result : result.status;
       if (status === "AVAILABLE") {
         this.lastSuccess.set(name, new Date().toISOString());
@@ -124,6 +141,17 @@ class RuntimeHealthService {
   }
 
   async readiness() {
+    if (this.lifecycle.state !== "RUNNING") {
+      return {
+        service: "platform-api",
+        status: "NOT_READY" as const,
+        version: readRuntimeIdentityConfig().version,
+        startedAt: processStartedAt,
+        checkedAt: new Date().toISOString(),
+        lifecycle: this.lifecycle.state,
+        dependencies: {},
+      };
+    }
     const entries = await Promise.all([
       this.check("postgresql", () => this.checkPostgreSql()),
       this.check("victoriametrics", () =>
@@ -214,6 +242,12 @@ class PlatformHealthController {
         "Failed Platform API requests.",
         "counter",
         requests.errors,
+      ),
+      metric(
+        "nop_runtime_accepting_work",
+        "Whether this runtime accepts new work.",
+        "gauge",
+        this.health.lifecycleState === "RUNNING" ? 1 : 0,
       ),
       "# HELP nop_runtime_configuration_loaded Validated runtime configuration categories loaded by this process.",
       "# TYPE nop_runtime_configuration_loaded gauge",
@@ -334,12 +368,18 @@ class WorkerHeartbeatService
   imports: [DatabaseModule],
   controllers: [PlatformHealthController],
   providers: [
+    RuntimeLifecycle,
     RuntimeHealthService,
     ApiRequestMetrics,
     { provide: APP_INTERCEPTOR, useExisting: ApiRequestMetrics },
   ],
+  exports: [RuntimeLifecycle],
 })
 export class PlatformHealthApiModule {}
 
-@Module({ imports: [DatabaseModule], providers: [WorkerHeartbeatService] })
+@Module({
+  imports: [DatabaseModule],
+  providers: [RuntimeLifecycle, WorkerHeartbeatService],
+  exports: [RuntimeLifecycle],
+})
 export class PlatformHealthWorkerModule {}

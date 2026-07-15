@@ -38,6 +38,12 @@ READY
 - `apps/platform 启停接线`
 - `services/collector 启停接线`
 - `tests/recovery/runtime/`
+- `package.json`
+- `.env.example`
+- `scripts/smoke-compose.ps1`
+- `scripts/smoke-compose.sh`
+
+T009 的完成定义明确要求根级 runtime-shutdown 恢复测试入口、跨平台 Compose 生命周期验收脚本，以及集中配置中的有界关闭参数示例；当前仓库缺少这些执行入口，因此需作最小范围修正。
 
 ## 禁止修改范围
 不得增加 HA、Kubernetes、自动迁移、多个 Worker 副本或生产真实 Secret。
