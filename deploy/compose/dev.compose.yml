@@ -109,6 +109,9 @@ services:
       PLATFORM_HEALTH_TIMEOUT_MS: ${PLATFORM_HEALTH_TIMEOUT_MS:-2000}
       WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
       WORKER_HEARTBEAT_STALE_AFTER_MS: ${WORKER_HEARTBEAT_STALE_AFTER_MS:-15000}
+      # Loopback/local development placeholders only. Production uses *_FILE.
+      COLLECTOR_SERVICE_TOKEN: ${COLLECTOR_SERVICE_TOKEN:-t008-local-development-only-collector-token}
+      VMALERT_SERVICE_TOKEN: ${VMALERT_SERVICE_TOKEN:-t008-local-development-only-vmalert-token}
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,6 +148,8 @@ services:
     environment:
       COLLECTOR_HEALTH_LISTEN_ADDRESS: 0.0.0.0:9090
       COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS: ${COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS:-2000}
+      # This identity is distinct from vmalert and is local-development only.
+      COLLECTOR_SERVICE_TOKEN: ${COLLECTOR_SERVICE_TOKEN:-t008-local-development-only-collector-token}
     healthcheck:
       test:
         [

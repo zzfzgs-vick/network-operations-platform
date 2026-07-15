@@ -7,10 +7,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
-	"time"
 
+	"github.com/zzfzgs-vick/network-operations-platform/services/collector/internal/config"
 	"github.com/zzfzgs-vick/network-operations-platform/services/collector/internal/observability"
 )
 
@@ -35,11 +34,11 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return fmt.Errorf("unknown argument: %s", args[0])
 	}
 
-	address := os.Getenv("COLLECTOR_HEALTH_LISTEN_ADDRESS")
-	if address == "" {
-		address = "127.0.0.1:9090"
+	configuration, err := config.Load()
+	if err != nil {
+		return err
 	}
-	server, err := observability.Start(address, version)
+	server, err := observability.Start(configuration.HealthListenAddress, version)
 	if err != nil {
 		return err
 	}
@@ -55,15 +54,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		}
 	}
 
-	timeout := 2 * time.Second
-	if raw := os.Getenv("COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS"); raw != "" {
-		milliseconds, err := strconv.Atoi(raw)
-		if err != nil || milliseconds < 1 {
-			return fmt.Errorf("COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS must be a positive integer")
-		}
-		timeout = time.Duration(milliseconds) * time.Millisecond
-	}
-	shutdownContext, cancel := context.WithTimeout(context.Background(), timeout)
+	shutdownContext, cancel := context.WithTimeout(context.Background(), configuration.HealthShutdownTimeout)
 	defer cancel()
 	if err := server.Shutdown(shutdownContext); err != nil {
 		return fmt.Errorf("stop Collector health server: %w", err)

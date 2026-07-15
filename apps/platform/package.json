@@ -10,9 +10,9 @@
     "start:api": "node dist/main.js",
     "start:worker": "node dist/worker.js",
     "build": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js",
-    "test": "tsc --project tsconfig.build.json && node --import ./dist/database/unit-test-setup.js --test dist/runtime.test.js dist/http/contract-exception.filter.test.js",
+    "test": "tsc --project tsconfig.build.json && node src/config/run-tests.mjs",
     "test:db": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node ../../scripts/db-test.mjs",
-    "test:integration": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node ../../tests/integration/health/run.mjs",
+    "test:integration": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node ../../tests/integration/config/run.mjs",
     "typecheck": "tsc --project tsconfig.build.json --noEmit"
   },
   "dependencies": {

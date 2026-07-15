@@ -7,6 +7,14 @@ coverage/
 .env.*
 !.env.example
 
+# Mounted production Secrets and private key material
+deploy/secrets/*
+!deploy/secrets/README.md
+*.key
+*.pem
+*.pfx
+*.p12
+
 *.test
 *.out
 

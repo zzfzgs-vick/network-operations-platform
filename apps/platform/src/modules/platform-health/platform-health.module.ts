@@ -16,6 +16,12 @@ import type { Observable } from "rxjs";
 import { tap } from "rxjs";
 
 import {
+  loadedConfigurationCategories,
+  readRuntimeHealthConfig,
+  readRuntimeIdentityConfig,
+} from "../../config/public.js";
+import { ServiceAuthenticationMetrics } from "../../config/service-auth.js";
+import {
   DatabaseModule,
   DatabaseService,
 } from "../../database/database.module.js";
@@ -25,7 +31,6 @@ import {
   type WorkerHeartbeatStatus,
 } from "./platform-health.js";
 
-type Environment = Readonly<Record<string, string | undefined>>;
 type DependencyName = "postgresql" | "victoriametrics" | "vmalert" | "worker";
 type DependencyStatus = "AVAILABLE" | "STALE" | "UNAVAILABLE";
 
@@ -34,96 +39,8 @@ interface DependencyHealth {
   readonly lastSuccessAt?: string;
 }
 
-interface RuntimeHealthConfig {
-  readonly victoriaMetricsUrl: URL;
-  readonly vmAlertUrl: URL;
-  readonly timeoutMs: number;
-  readonly heartbeatIntervalMs: number;
-  readonly heartbeatStaleAfterMs: number;
-  readonly workerInstanceId: string;
-}
-
 const processStartedAt = new Date().toISOString();
-const stableValuePattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
-
-function positiveInteger(
-  environment: Environment,
-  name: string,
-  fallback: number,
-) {
-  const raw = environment[name];
-  const value = raw === undefined ? fallback : Number(raw);
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`${name} must be a positive integer`);
-  }
-  return value;
-}
-
-function boundedValue(
-  environment: Environment,
-  name: string,
-  fallback: string,
-  maximumLength: number,
-) {
-  const value = environment[name]?.trim() || fallback;
-  if (value.length > maximumLength || !stableValuePattern.test(value)) {
-    throw new Error(`${name} must be a bounded stable value`);
-  }
-  return value;
-}
-
-function serviceUrl(environment: Environment, name: string, fallback: string) {
-  const url = new URL(environment[name] ?? fallback);
-  if (
-    (url.protocol !== "http:" && url.protocol !== "https:") ||
-    url.username ||
-    url.password
-  ) {
-    throw new Error(`${name} must be an HTTP URL without credentials`);
-  }
-  return url;
-}
-
-export function readRuntimeHealthConfig(
-  environment: Environment = process.env,
-): RuntimeHealthConfig {
-  const heartbeatIntervalMs = positiveInteger(
-    environment,
-    "WORKER_HEARTBEAT_INTERVAL_MS",
-    5_000,
-  );
-  const heartbeatStaleAfterMs = positiveInteger(
-    environment,
-    "WORKER_HEARTBEAT_STALE_AFTER_MS",
-    15_000,
-  );
-  if (heartbeatStaleAfterMs <= heartbeatIntervalMs) {
-    throw new Error(
-      "WORKER_HEARTBEAT_STALE_AFTER_MS must exceed WORKER_HEARTBEAT_INTERVAL_MS",
-    );
-  }
-  return {
-    victoriaMetricsUrl: serviceUrl(
-      environment,
-      "VICTORIAMETRICS_URL",
-      "http://127.0.0.1:8428",
-    ),
-    vmAlertUrl: serviceUrl(environment, "VMALERT_URL", "http://127.0.0.1:8880"),
-    timeoutMs: positiveInteger(
-      environment,
-      "PLATFORM_HEALTH_TIMEOUT_MS",
-      2_000,
-    ),
-    heartbeatIntervalMs,
-    heartbeatStaleAfterMs,
-    workerInstanceId: boundedValue(
-      environment,
-      "WORKER_INSTANCE_ID",
-      "platform-worker-local",
-      128,
-    ),
-  };
-}
+export { readRuntimeHealthConfig } from "../../config/public.js";
 
 @Injectable()
 class ApiRequestMetrics implements NestInterceptor {
@@ -226,7 +143,7 @@ class RuntimeHealthService {
       status: entries.every((dependency) => dependency.status === "AVAILABLE")
         ? ("READY" as const)
         : ("NOT_READY" as const),
-      version: process.env.APP_VERSION ?? "dev",
+      version: readRuntimeIdentityConfig().version,
       startedAt: processStartedAt,
       checkedAt: new Date().toISOString(),
       dependencies,
@@ -256,6 +173,7 @@ class PlatformHealthController {
   constructor(
     private readonly health: RuntimeHealthService,
     private readonly requests: ApiRequestMetrics,
+    private readonly serviceAuthentication: ServiceAuthenticationMetrics,
   ) {}
 
   @Get("health/live")
@@ -263,7 +181,7 @@ class PlatformHealthController {
     return {
       service: "platform-api",
       status: "ALIVE",
-      version: process.env.APP_VERSION ?? "dev",
+      version: readRuntimeIdentityConfig().version,
       startedAt: processStartedAt,
     };
   }
@@ -283,6 +201,7 @@ class PlatformHealthController {
     const health = await this.health.readiness();
     const reliable = await this.health.reliableWorkMetrics();
     const requests = this.requests.snapshot();
+    const authenticationFailures = this.serviceAuthentication.snapshot();
     const lines = [
       metric(
         "nop_api_requests_success_total",
@@ -295,6 +214,18 @@ class PlatformHealthController {
         "Failed Platform API requests.",
         "counter",
         requests.errors,
+      ),
+      "# HELP nop_runtime_configuration_loaded Validated runtime configuration categories loaded by this process.",
+      "# TYPE nop_runtime_configuration_loaded gauge",
+      ...loadedConfigurationCategories.map(
+        (category) =>
+          `nop_runtime_configuration_loaded{category="${category}"} 1`,
+      ),
+      "# HELP nop_internal_service_auth_failures_total Failed internal service authentication attempts.",
+      "# TYPE nop_internal_service_auth_failures_total counter",
+      ...authenticationFailures.map(
+        (failure) =>
+          `nop_internal_service_auth_failures_total{service="${failure.service}",reason="${failure.reason}"} ${failure.count}`,
       ),
       "# HELP nop_runtime_dependency_available Dependency readiness (1 available, 0 unavailable or stale).",
       "# TYPE nop_runtime_dependency_available gauge",
@@ -365,7 +296,7 @@ class WorkerHeartbeatService
         workerType: "platform-worker",
         instanceId: this.config.workerInstanceId,
         startedAt: this.startedAt,
-        version: process.env.APP_VERSION ?? "dev",
+        version: readRuntimeIdentityConfig().version,
       });
     } catch {
       console.error("platform-worker heartbeat write failed");

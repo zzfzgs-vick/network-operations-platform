@@ -13,6 +13,8 @@ import (
 )
 
 func TestRunStopsWhenContextIsCancelled(t *testing.T) {
+	t.Setenv("NODE_ENV", "test")
+	t.Setenv("COLLECTOR_SERVICE_TOKEN", "t008-test-only-collector-token-not-production")
 	t.Setenv("COLLECTOR_HEALTH_LISTEN_ADDRESS", "127.0.0.1:0")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -32,6 +34,8 @@ func TestRunStopsWhenContextIsCancelled(t *testing.T) {
 }
 
 func TestHealthEndpointUsesTheRealCollectorLifecycle(t *testing.T) {
+	t.Setenv("NODE_ENV", "test")
+	t.Setenv("COLLECTOR_SERVICE_TOKEN", "t008-test-only-collector-token-not-production")
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -111,5 +115,19 @@ func TestRunReportsVersion(t *testing.T) {
 
 	if got := output.String(); got != "collector dev\n" {
 		t.Fatalf("unexpected version output: %q", got)
+	}
+}
+
+func TestConfigFailureDoesNotLeakCollectorSecret(t *testing.T) {
+	secret := "t008-canary-collector-secret"
+	t.Setenv("NODE_ENV", "production")
+	t.Setenv("COLLECTOR_SERVICE_TOKEN", secret)
+	var output bytes.Buffer
+	err := run(context.Background(), nil, &output)
+	if err == nil {
+		t.Fatal("expected production configuration failure")
+	}
+	if strings.Contains(err.Error(), secret) || strings.Contains(output.String(), secret) {
+		t.Fatal("Collector Secret leaked")
 	}
 }

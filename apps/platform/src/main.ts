@@ -4,28 +4,23 @@ import { NestFactory } from "@nestjs/core";
 import { pathToFileURL } from "node:url";
 
 import { ApiAppModule } from "./bootstrap/api-app.module.js";
+import {
+  readApiListenConfig,
+  readRuntimeIdentityConfig,
+} from "./config/public.js";
 import { waitForShutdown } from "./lifecycle.js";
 
 export async function createApiApplication() {
   return NestFactory.create(ApiAppModule);
 }
 
-function configuredPort() {
-  const value = Number(process.env.PORT ?? "3000");
-
-  if (!Number.isInteger(value) || value < 1 || value > 65535) {
-    throw new Error("PORT must be an integer between 1 and 65535");
-  }
-
-  return value;
-}
-
 async function startApi() {
+  const listen = readApiListenConfig();
+  const runtime = readRuntimeIdentityConfig();
   const app = await createApiApplication();
-  const version = process.env.APP_VERSION ?? "dev";
 
-  await app.listen(configuredPort(), process.env.HOST ?? "127.0.0.1");
-  console.info(`platform-api started version=${version}`);
+  await app.listen(listen.port, listen.host);
+  console.info(`platform-api started version=${runtime.version}`);
 
   const signal = await waitForShutdown();
   console.info(`platform-api stopping signal=${signal}`);

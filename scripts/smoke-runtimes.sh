@@ -10,8 +10,7 @@ cleanup() {
   if [[ "$status" -ne 0 ]]; then
     for log in web api worker collector; do
       if [[ -f "$tmp/$log.log" ]]; then
-        echo "--- $log runtime log ---" >&2
-        sed -n '1,120p' "$tmp/$log.log" >&2
+        echo "$log runtime failed; raw log output suppressed" >&2
       fi
     done
   fi
@@ -75,9 +74,14 @@ export PLATFORM_HEALTH_TIMEOUT_MS=2000
 export WORKER_HEARTBEAT_INTERVAL_MS=1000
 export WORKER_HEARTBEAT_STALE_AFTER_MS=5000
 export WORKER_INSTANCE_ID=platform-worker-smoke
+collector_service_token="t008-test-only-collector-token-not-production"
+vmalert_service_token="t008-test-only-vmalert-token-not-production"
 
 dependency_health_verified=false
 if docker_available; then
+  COLLECTOR_SERVICE_TOKEN="$collector_service_token" \
+  VMALERT_SERVICE_TOKEN="$vmalert_service_token" \
+    npm run test:integration --workspace apps/platform -- service-auth
   npm run test:integration --workspace apps/platform -- platform-health
   npm run db:migrate --workspace apps/platform
   dependency_health_verified=true
@@ -99,6 +103,20 @@ mkdir -p "$(dirname "$collector")"
 go build -o "$collector" ./services/collector/cmd/collector
 test "$($collector --version)" = "collector dev"
 
+if env \
+  -u COLLECTOR_SERVICE_TOKEN \
+  -u COLLECTOR_SERVICE_TOKEN_FILE \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN_FILE \
+  -u VMALERT_SERVICE_TOKEN \
+  -u VMALERT_SERVICE_TOKEN_FILE \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN_FILE \
+  "$collector" >"$tmp/collector-missing-credential.log" 2>&1; then
+  echo "Collector without a credential unexpectedly succeeded" >&2
+  exit 1
+fi
+
 node "$root/node_modules/vite/bin/vite.js" preview "$root/apps/web" \
   --host 127.0.0.1 --port "$web_port" --strictPort \
   --config "$root/apps/web/vite.config.ts" \
@@ -106,18 +124,45 @@ node "$root/node_modules/vite/bin/vite.js" preview "$root/apps/web" \
 web_pid=$!
 pids+=("$web_pid")
 
-HOST=127.0.0.1 PORT="$api_port" \
+env \
+  -u COLLECTOR_SERVICE_TOKEN_FILE \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN_FILE \
+  -u VMALERT_SERVICE_TOKEN_FILE \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN_FILE \
+  COLLECTOR_SERVICE_TOKEN="$collector_service_token" \
+  VMALERT_SERVICE_TOKEN="$vmalert_service_token" \
+  HOST=127.0.0.1 PORT="$api_port" \
   node "$root/apps/platform/dist/main.js" >"$tmp/api.log" 2>&1 &
 api_pid=$!
 pids+=("$api_pid")
 
-PORT="$worker_probe_port" \
+env \
+  -u COLLECTOR_SERVICE_TOKEN \
+  -u COLLECTOR_SERVICE_TOKEN_FILE \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN_FILE \
+  -u VMALERT_SERVICE_TOKEN \
+  -u VMALERT_SERVICE_TOKEN_FILE \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN_FILE \
+  PORT="$worker_probe_port" \
   node "$root/apps/platform/dist/worker.js" >"$tmp/worker.log" 2>&1 &
 worker_pid=$!
 pids+=("$worker_pid")
 
-COLLECTOR_HEALTH_LISTEN_ADDRESS="127.0.0.1:$collector_health_port" \
-COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS=2000 \
+env \
+  -u COLLECTOR_SERVICE_TOKEN_FILE \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN \
+  -u COLLECTOR_SERVICE_PREVIOUS_TOKEN_FILE \
+  -u VMALERT_SERVICE_TOKEN \
+  -u VMALERT_SERVICE_TOKEN_FILE \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN \
+  -u VMALERT_SERVICE_PREVIOUS_TOKEN_FILE \
+  COLLECTOR_SERVICE_TOKEN="$collector_service_token" \
+  COLLECTOR_HEALTH_LISTEN_ADDRESS="127.0.0.1:$collector_health_port" \
+  COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS=2000 \
   "$collector" >"$tmp/collector.log" 2>&1 &
 collector_pid=$!
 pids+=("$collector_pid")
@@ -126,6 +171,7 @@ wait_http "http://127.0.0.1:$web_port" "Network Operations Platform"
 wait_http "http://127.0.0.1:$api_port" '"service":"platform-api"'
 wait_http "http://127.0.0.1:$api_port/health/live" '"status":"ALIVE"'
 wait_http "http://127.0.0.1:$api_port/metrics" "nop_runtime_dependency_available"
+wait_http "http://127.0.0.1:$api_port/metrics" 'nop_runtime_configuration_loaded{category="runtime"} 1'
 wait_http "http://127.0.0.1:$collector_health_port/health/ready" '"status":"READY"'
 
 if [[ "$dependency_health_verified" == true ]]; then
@@ -162,6 +208,11 @@ pids=()
 grep -q "platform-api stopped" "$tmp/api.log"
 grep -q "platform-worker stopped" "$tmp/worker.log"
 grep -q "collector stopped" "$tmp/collector.log"
+if grep -F -q "$collector_service_token" "$tmp"/*.log || \
+   grep -F -q "$vmalert_service_token" "$tmp"/*.log; then
+  echo "A test-only service credential appeared in runtime logs" >&2
+  exit 1
+fi
 
 echo "Web runtime: PASS"
 echo "API runtime: PASS (SIGTERM)"

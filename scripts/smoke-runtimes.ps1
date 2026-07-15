@@ -16,7 +16,8 @@ function Start-RuntimeProcess {
         [Parameter(Mandatory)] [string] $FilePath,
         [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $ArgumentList,
         [Parameter(Mandatory)] [string] $WorkingDirectory,
-        [hashtable] $Environment = @{}
+        [hashtable] $Environment = @{},
+        [string[]] $RemoveEnvironment = @()
     )
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -26,6 +27,9 @@ function Start-RuntimeProcess {
 
     foreach ($argument in $ArgumentList) {
         $startInfo.ArgumentList.Add($argument)
+    }
+    foreach ($name in $RemoveEnvironment) {
+        $startInfo.Environment.Remove($name)
     }
     foreach ($entry in $Environment.GetEnumerator()) {
         $startInfo.Environment[$entry.Key] = $entry.Value
@@ -99,6 +103,18 @@ $platformDirectory = Join-Path $root 'apps/platform'
 $collectorDirectory = Join-Path $root 'services/collector'
 $collectorOutput = Join-Path $collectorDirectory 'dist/collector.exe'
 $processes = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+$collectorServiceToken = 't008-test-only-collector-token-not-production'
+$vmAlertServiceToken = 't008-test-only-vmalert-token-not-production'
+$serviceSecretNames = @(
+    'COLLECTOR_SERVICE_TOKEN',
+    'COLLECTOR_SERVICE_TOKEN_FILE',
+    'COLLECTOR_SERVICE_PREVIOUS_TOKEN',
+    'COLLECTOR_SERVICE_PREVIOUS_TOKEN_FILE',
+    'VMALERT_SERVICE_TOKEN',
+    'VMALERT_SERVICE_TOKEN_FILE',
+    'VMALERT_SERVICE_PREVIOUS_TOKEN',
+    'VMALERT_SERVICE_PREVIOUS_TOKEN_FILE'
+)
 
 $env:DATABASE_HOST = '127.0.0.1'
 $env:DATABASE_PORT = '5432'
@@ -118,6 +134,8 @@ $env:WORKER_INSTANCE_ID = 'platform-worker-smoke'
 
 $dependencyHealthVerified = Test-DockerRuntime
 if ($dependencyHealthVerified) {
+    npm run test:integration --workspace apps/platform -- service-auth
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     npm run test:integration --workspace apps/platform -- platform-health
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     npm run db:migrate --workspace apps/platform
@@ -148,6 +166,23 @@ $collectorVersion = & $collectorOutput --version
 if ($collectorVersion -ne 'collector dev') {
     throw "Unexpected Collector version: $collectorVersion"
 }
+
+$missingCredentialCollector = Start-RuntimeProcess `
+    -FilePath $collectorOutput `
+    -ArgumentList @() `
+    -WorkingDirectory $collectorDirectory `
+    -RemoveEnvironment $serviceSecretNames
+if (-not $missingCredentialCollector.WaitForExit(5000)) {
+    $missingCredentialCollector.Kill($true)
+    $missingCredentialCollector.WaitForExit()
+    $missingCredentialCollector.Dispose()
+    throw 'Collector without a credential did not fail fast'
+}
+if ($missingCredentialCollector.ExitCode -eq 0) {
+    $missingCredentialCollector.Dispose()
+    throw 'Collector without a credential unexpectedly succeeded'
+}
+$missingCredentialCollector.Dispose()
 
 $webPort = Get-FreePort
 $apiPort = Get-FreePort
@@ -191,25 +226,33 @@ try {
 
     $api = Start-RuntimeProcess -FilePath $node -ArgumentList @(
         (Join-Path $platformDirectory 'dist/main.js')
-    ) -WorkingDirectory $platformDirectory -Environment ($platformEnvironment + @{
-        HOST = '127.0.0.1'
-        PORT = [string] $apiPort
-    })
+    ) -WorkingDirectory $platformDirectory `
+        -RemoveEnvironment $serviceSecretNames `
+        -Environment ($platformEnvironment + @{
+            HOST = '127.0.0.1'
+            PORT = [string] $apiPort
+            COLLECTOR_SERVICE_TOKEN = $collectorServiceToken
+            VMALERT_SERVICE_TOKEN = $vmAlertServiceToken
+        })
     $processes.Add($api)
 
     $worker = Start-RuntimeProcess -FilePath $node -ArgumentList @(
         (Join-Path $platformDirectory 'dist/worker.js')
-    ) -WorkingDirectory $platformDirectory -Environment ($platformEnvironment + @{
-        PORT = [string] $workerProbePort
-    })
+    ) -WorkingDirectory $platformDirectory `
+        -RemoveEnvironment $serviceSecretNames `
+        -Environment ($platformEnvironment + @{
+            PORT = [string] $workerProbePort
+        })
     $processes.Add($worker)
 
     $collector = Start-RuntimeProcess -FilePath $collectorOutput `
         -ArgumentList @() `
         -WorkingDirectory $collectorDirectory `
+        -RemoveEnvironment $serviceSecretNames `
         -Environment @{
             COLLECTOR_HEALTH_LISTEN_ADDRESS = "127.0.0.1:$collectorHealthPort"
             COLLECTOR_HEALTH_SHUTDOWN_TIMEOUT_MS = '2000'
+            COLLECTOR_SERVICE_TOKEN = $collectorServiceToken
         }
     $processes.Add($collector)
 
@@ -238,6 +281,9 @@ try {
         param($response)
         if ($response.Content -notmatch 'nop_runtime_dependency_available') {
             throw 'API runtime metrics are missing'
+        }
+        if ($response.Content -notmatch 'nop_runtime_configuration_loaded\{category="runtime"\} 1') {
+            throw 'API configuration-loaded metric is missing'
         }
     }
 

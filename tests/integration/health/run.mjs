@@ -77,8 +77,10 @@ try {
     VMALERT_URL: `http://127.0.0.1:${process.env.VMALERT_PORT ?? "8880"}`,
     PLATFORM_HEALTH_TIMEOUT_MS: "1000",
     WORKER_HEARTBEAT_INTERVAL_MS: "1000",
-    WORKER_HEARTBEAT_STALE_AFTER_MS: "3000",
+    WORKER_HEARTBEAT_STALE_AFTER_MS: "15000",
     WORKER_INSTANCE_ID: "t007-worker",
+    COLLECTOR_SERVICE_TOKEN: "t008-test-only-collector-token-not-production",
+    VMALERT_SERVICE_TOKEN: "t008-test-only-vmalert-token-not-production",
     T007_V2_DATABASE_NAME: v2Database,
   };
 
