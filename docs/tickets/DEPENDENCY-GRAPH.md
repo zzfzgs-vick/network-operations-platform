@@ -16,8 +16,8 @@ flowchart TD
     T005["T005 DONE · 共享协议与生成防漂移"]
     T006["T006 DONE · PostgreSQL 可靠工作纵切"]
     T007["T007 DONE · 平台可观测性基线"]
-    T008["T008 READY · 配置、Secret 与服务认证"]
-    T009["T009 运行容器与优雅生命周期"]
+    T008["T008 DONE · 配置、Secret 与服务认证"]
+    T009["T009 READY · 运行容器与优雅生命周期"]
   end
   subgraph P2["Phase 2 身份和平台安全"]
     T010["T010 追加式审计基础"]
@@ -244,7 +244,7 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001～T007 已完成，当前先执行 T008；T009 仍等待 T008 完成。
+- T001～T008 已完成，当前先执行 T009。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
@@ -253,7 +253,7 @@ flowchart TD
 
 ## 当前首个可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T007：平台可观测性与健康检查基线](T007-platform-observability-health-baseline.md) 已为 DONE。[T008：配置加载、Secret 边界与内部服务认证](T008-configuration-secrets-service-auth.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T008：配置加载、Secret 边界与内部服务认证](T008-configuration-secrets-service-auth.md) 已为 DONE。[T009：API、Worker 和 Go 容器运行与优雅生命周期](T009-runtime-containers-graceful-lifecycle.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
 
 ## DAG 检查规则
 

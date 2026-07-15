@@ -2,7 +2,14 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- WSL Ubuntu 24.04 本地原生 Node.js、Go、配置、服务认证、真实 PostgreSQL 18.4、运行健康及跨进程冒烟验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `b191c67d21dbe9776c135c971d3263fca84280c3`；Windows PowerShell 冒烟可移植性修正 `056b0893aa83f82742e9432a8c3e047b1656e69a`。
+- CI 可识别信息：GitHub Actions workflow `quality`，最终通过 run `29385856506`，Ubuntu job `87258860554`，Windows job `87258860542`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29385856506>。
 
 ## 目标
 
