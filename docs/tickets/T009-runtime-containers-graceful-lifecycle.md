@@ -2,7 +2,14 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- WSL Ubuntu 24.04 本地原生 Node.js、Go、真实 PostgreSQL 18.4、运行时恢复及 Compose 生命周期验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `584200d56e33dd090c697af51de0c8f5138959cd`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29390135819`，Ubuntu job `87271542341`，Windows job `87271542364`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29390135819>。
 
 ## 目标
 完成单主机运行容器的独立命令、迁移前置、资源保护和关停恢复基线。

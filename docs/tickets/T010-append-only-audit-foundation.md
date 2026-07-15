@@ -1,7 +1,7 @@
 # T010：追加式审计与请求关联基础
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 建立统一 actor/correlation 上下文、追加式 Audit Event 和敏感字段红线。
@@ -78,4 +78,3 @@ PLANNED
 ## 后续 Ticket
 - [T011](T011-local-users-password-bootstrap.md)
 - [T018](T018-location-hierarchy-desired-state.md)
-
