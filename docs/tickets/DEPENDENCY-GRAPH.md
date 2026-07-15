@@ -20,8 +20,8 @@ flowchart TD
     T009["T009 DONE · 运行容器与优雅生命周期"]
   end
   subgraph P2["Phase 2 身份和平台安全"]
-    T010["T010 READY · 追加式审计基础"]
-    T011["T011 本地用户、密码与初始化"]
+    T010["T010 DONE · 追加式审计基础"]
+    T011["T011 READY · 本地用户、密码与初始化"]
     T012["T012 权限集合与 RBAC"]
     T013["T013 PostgreSQL 不透明会话"]
     T014["T014 CSRF 与会话/SSE 生命周期"]
@@ -244,7 +244,7 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001～T009 已完成，当前先执行 T010。
+- T001～T010 已完成，当前先执行 T011。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
@@ -253,7 +253,7 @@ flowchart TD
 
 ## 当前首个可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T009：API、Worker 和 Go 容器运行与优雅生命周期](T009-runtime-containers-graceful-lifecycle.md) 已为 DONE。[T010：追加式审计与请求关联基础](T010-append-only-audit-foundation.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T010：追加式审计与请求关联基础](T010-append-only-audit-foundation.md) 已为 DONE。[T011：本地用户、密码与首个管理员初始化](T011-local-users-password-bootstrap.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
 
 ## DAG 检查规则
 

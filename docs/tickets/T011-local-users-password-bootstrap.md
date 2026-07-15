@@ -1,7 +1,7 @@
 # T011：本地用户、密码与首个管理员初始化
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 实现不可变 userId、本地密码生命周期和一次性安全管理员初始化。
@@ -71,4 +71,3 @@ MVP 无外部 IdP，所有后续权限与审计都依赖稳定平台用户身份
 
 ## 后续 Ticket
 - [T012](T012-permission-rbac-enforcement.md)
-

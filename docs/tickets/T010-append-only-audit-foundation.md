@@ -1,7 +1,14 @@
 # T010：追加式审计与请求关联基础
 
 ## 状态
-READY
+DONE
+
+## 完成记录
+
+- WSL Ubuntu 24.04 本地原生 Node.js、Go、真实 PostgreSQL 18.4、审计脱敏及运行时回归验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `4e53ec121adbe9e016ac11818527cb7acc054879`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29396912564`，Ubuntu job `87292393333`，Windows job `87292393364`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29396912564>。
 
 ## 目标
 建立统一 actor/correlation 上下文、追加式 Audit Event 和敏感字段红线。
