@@ -29,7 +29,7 @@ function Start-RuntimeProcess {
         $startInfo.ArgumentList.Add($argument)
     }
     foreach ($name in $RemoveEnvironment) {
-        $startInfo.Environment.Remove($name)
+        [void] $startInfo.Environment.Remove($name)
     }
     foreach ($entry in $Environment.GetEnumerator()) {
         $startInfo.Environment[$entry.Key] = $entry.Value
