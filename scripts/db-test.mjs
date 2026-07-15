@@ -5,18 +5,19 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = "deploy/compose/dev.compose.yml";
-const testDatabase = `nop_t004_${randomUUID().replaceAll("-", "")}`;
 const databaseUser = process.env.DATABASE_USER ?? "nop";
 const [selection = "database", ...extraSelections] = process.argv.slice(2);
 
 if (
   extraSelections.length > 0 ||
-  !["database", "reliable-work"].includes(selection)
+  !["audit", "database", "reliable-work"].includes(selection)
 ) {
   throw new Error(
     `Unknown database test selection: ${process.argv.slice(2).join(" ")}`,
   );
 }
+
+const testDatabase = `nop_${selection === "audit" ? "t010" : "t004"}_${randomUUID().replaceAll("-", "")}`;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -90,13 +91,24 @@ try {
     DATABASE_QUERY_TIMEOUT_MS: "10000",
   };
 
-  run(
-    process.execPath,
-    ["--test", "tests/integration/database/database.test.mjs"],
-    {
-      env: environment,
-    },
-  );
+  const testFile =
+    selection === "audit"
+      ? "tests/integration/audit/audit.test.mjs"
+      : "tests/integration/database/database.test.mjs";
+  if (selection === "audit") {
+    const output = run(
+      process.execPath,
+      ["--test-reporter=tap", "--test", testFile],
+      { env: environment, capture: true },
+    );
+    process.stdout.write(`${output}\n`);
+    const count = /^# tests (\d+)$/m.exec(output);
+    if (!count || Number(count[1]) < 1) {
+      throw new Error("Selected audit database suite executed zero tests");
+    }
+  } else {
+    run(process.execPath, ["--test", testFile], { env: environment });
+  }
 } finally {
   compose([
     "exec",

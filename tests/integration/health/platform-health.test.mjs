@@ -246,7 +246,7 @@ test("Worker entry module writes and stops its persistent heartbeat", async () =
   }
 });
 
-test("Migration chain upgrades v2 to v3 and remains idempotent", async () => {
+test("Migration chain upgrades v2 to the latest version and remains idempotent", async () => {
   const directory = await mkdtemp(join(tmpdir(), "nop-t007-v2-"));
   const databaseName = process.env.T007_V2_DATABASE_NAME;
   assert.ok(databaseName);
@@ -267,13 +267,25 @@ test("Migration chain upgrades v2 to v3 and remains idempotent", async () => {
     const initial = await applyMigrations(pool, directory);
     assert.deepEqual(initial, { appliedCount: 2, currentVersion: 2 });
 
+    const beforeUpgrade = await getMigrationStatus(pool);
+    const latestVersion = beforeUpgrade.latestVersion;
+    const expectedAppliedCount = beforeUpgrade.pendingVersions.filter(
+      (version) => version > 2,
+    ).length;
+
     const upgrade = await applyMigrations(pool);
-    assert.deepEqual(upgrade, { appliedCount: 1, currentVersion: 3 });
+    assert.deepEqual(upgrade, {
+      appliedCount: expectedAppliedCount,
+      currentVersion: latestVersion,
+    });
     const repeat = await applyMigrations(pool);
-    assert.deepEqual(repeat, { appliedCount: 0, currentVersion: 3 });
+    assert.deepEqual(repeat, {
+      appliedCount: 0,
+      currentVersion: latestVersion,
+    });
     assert.deepEqual(await getMigrationStatus(pool), {
-      currentVersion: 3,
-      latestVersion: 3,
+      currentVersion: latestVersion,
+      latestVersion,
       pendingVersions: [],
       compatible: true,
     });

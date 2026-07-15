@@ -16,6 +16,7 @@
     "contracts:check": "node scripts/contracts-check.mjs",
     "test:contract": "node scripts/contracts-test.mjs",
     "test:contract:docker": "node scripts/contracts-docker-test.mjs",
+    "test:security": "npm run build --workspace @nop/platform && node tests/integration/audit/run-security.mjs",
     "format:check": "prettier --check --ignore-unknown package.json tsconfig.json eslint.config.mjs scripts .github README.md",
     "lint": "eslint .",
     "typecheck": "tsc --project tsconfig.json --noEmit",

@@ -20,3 +20,7 @@ and Dead Letter schema. After release it is immutable; corrections use a new for
 `0003_platform_health_foundation.up.sql` owns the bounded Worker heartbeat registry and the
 single-row Inbox duplicate counter used by T007 runtime observability. It does not contain business
 health data.
+
+`0004_audit_foundation.up.sql` owns the append-only Audit Event store, stable query indexes, and
+database triggers that reject ordinary `UPDATE`, `DELETE`, and `TRUNCATE`. Corrections append a new
+event; released audit history is never rewritten by application capabilities.

@@ -30,10 +30,18 @@ READY
 - [T008](T008-configuration-secrets-service-auth.md)
 
 ## 允许修改范围
+- `package.json`
+- `scripts/db-test.mjs`
+- `docs/tickets/T010-append-only-audit-foundation.md`
 - `apps/platform/src/modules/audit/`
 - `apps/platform/migrations/`
 - `packages/contracts/ 的 audit-safe envelope`
 - `tests/integration/audit/`
+- `tests/integration/health/platform-health.test.mjs`
+
+T010 的完成定义要求通过统一命令执行真实 PostgreSQL 审计集成测试和审计脱敏安全测试。当前根级缺少 test:security 入口，数据库测试分发器也不识别 audit 选择器，因此需要最小范围修正。
+
+T010 新增 0004 迁移后，T007 Platform Health 集成测试中固定的 v2→v3 断言不再成立。测试应基于仓库迁移清单动态验证从 v2 升级到当前最新版本，同时保留重复执行、兼容性和校验断言。
 
 ## 禁止修改范围
 不得实现具体业务审计事件、审计删除、Secret/Token/Cookie 原文记录或可覆盖时间线。
