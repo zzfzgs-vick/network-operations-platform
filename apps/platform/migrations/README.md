@@ -24,3 +24,7 @@ health data.
 `0004_audit_foundation.up.sql` owns the append-only Audit Event store, stable query indexes, and
 database triggers that reject ordinary `UPDATE`, `DELETE`, and `TRUNCATE`. Corrections append a new
 event; released audit history is never rewritten by application capabilities.
+
+`0005_identity_access_local_users.up.sql` owns immutable Platform User identity, one Local
+Credential per user, bounded authentication throttling, and the singleton first-administrator
+bootstrap state. Passwords are represented only by Argon2id PHC strings.

@@ -5,17 +5,21 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const selections = process.argv.slice(2);
 
-if (selections.length !== 1 || selections[0] !== "audit-redaction") {
+if (
+  selections.length !== 1 ||
+  !["audit-redaction", "password-policy"].includes(selections[0])
+) {
   throw new Error(`Unknown security test selection: ${selections.join(" ")}`);
 }
 
+const testFile =
+  selections[0] === "password-policy"
+    ? "tests/integration/auth/password-policy.test.mjs"
+    : "tests/integration/audit/audit-redaction.test.mjs";
+
 const result = spawnSync(
   process.execPath,
-  [
-    "--test-reporter=tap",
-    "--test",
-    "tests/integration/audit/audit-redaction.test.mjs",
-  ],
+  ["--test-reporter=tap", "--test", testFile],
   { cwd: root, encoding: "utf8" },
 );
 
@@ -23,7 +27,7 @@ if (result.error) throw result.error;
 const output = result.stdout?.trim() ?? "";
 if (output) process.stdout.write(`${output}\n`);
 if (result.status !== 0) {
-  throw new Error(`Audit redaction tests exited with status ${result.status}`);
+  throw new Error(`Security tests exited with status ${result.status}`);
 }
 const count = /^# tests (\d+)$/m.exec(output);
 if (!count || Number(count[1]) < 1) {

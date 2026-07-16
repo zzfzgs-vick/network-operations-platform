@@ -7,6 +7,7 @@
     "db:migrate": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/migrate.js up",
     "db:status": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/migrate.js status",
     "db:verify": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/migrate.js verify",
+    "identity:bootstrap-admin": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js && node dist/modules/identity-access/bootstrap-admin.js",
     "start:api": "node dist/main.js",
     "start:worker": "node dist/worker.js",
     "build": "tsc --project tsconfig.build.json && node dist/database/copy-migrations.js",
@@ -16,10 +17,11 @@
     "typecheck": "tsc --project tsconfig.build.json --noEmit"
   },
   "dependencies": {
-    "@nop/contracts": "0.0.0",
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-express": "11.1.28",
+    "@nop/contracts": "0.0.0",
+    "argon2": "0.44.0",
     "pg": "8.22.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"

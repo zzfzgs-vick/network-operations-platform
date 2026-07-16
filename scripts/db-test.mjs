@@ -10,14 +10,19 @@ const [selection = "database", ...extraSelections] = process.argv.slice(2);
 
 if (
   extraSelections.length > 0 ||
-  !["audit", "database", "reliable-work"].includes(selection)
+  !["audit", "database", "local-auth", "reliable-work"].includes(selection)
 ) {
   throw new Error(
     `Unknown database test selection: ${process.argv.slice(2).join(" ")}`,
   );
 }
 
-const testDatabase = `nop_${selection === "audit" ? "t010" : "t004"}_${randomUUID().replaceAll("-", "")}`;
+const ticketBySelection = {
+  audit: "t010",
+  database: "t004",
+  "local-auth": "t011",
+};
+const testDatabase = `nop_${ticketBySelection[selection] ?? "t004"}_${randomUUID().replaceAll("-", "")}`;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -31,6 +36,10 @@ function run(command, args, options = {}) {
     throw result.error;
   }
   if (result.status !== 0) {
+    if (options.capture) {
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+    }
     throw new Error(`${command} exited with status ${result.status}`);
   }
 
@@ -91,11 +100,13 @@ try {
     DATABASE_QUERY_TIMEOUT_MS: "10000",
   };
 
-  const testFile =
-    selection === "audit"
-      ? "tests/integration/audit/audit.test.mjs"
-      : "tests/integration/database/database.test.mjs";
-  if (selection === "audit") {
+  const testFileBySelection = {
+    audit: "tests/integration/audit/audit.test.mjs",
+    database: "tests/integration/database/database.test.mjs",
+    "local-auth": "tests/integration/auth/local-auth.test.mjs",
+  };
+  const testFile = testFileBySelection[selection];
+  if (selection !== "database") {
     const output = run(
       process.execPath,
       ["--test-reporter=tap", "--test", testFile],
@@ -104,7 +115,9 @@ try {
     process.stdout.write(`${output}\n`);
     const count = /^# tests (\d+)$/m.exec(output);
     if (!count || Number(count[1]) < 1) {
-      throw new Error("Selected audit database suite executed zero tests");
+      throw new Error(
+        `Selected ${selection} database suite executed zero tests`,
+      );
     }
   } else {
     run(process.execPath, ["--test", testFile], { env: environment });

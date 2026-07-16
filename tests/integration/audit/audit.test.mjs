@@ -20,6 +20,18 @@ import { AuditStore } from "../../../apps/platform/dist/modules/audit/public.js"
 const migrationDirectory = fileURLToPath(
   new URL("../../../apps/platform/migrations/", import.meta.url),
 );
+const migrationFilePattern = /^(\d{4})_[a-z0-9_]+\.up\.sql$/u;
+const repositoryMigrations = (await readdir(migrationDirectory))
+  .map((fileName) => {
+    const match = migrationFilePattern.exec(fileName);
+    return match ? { fileName, version: Number(match[1]) } : null;
+  })
+  .filter((migration) => migration !== null)
+  .sort((left, right) => left.version - right.version);
+const latestMigrationVersion = repositoryMigrations.at(-1)?.version ?? 0;
+const upgradeFromV3 = repositoryMigrations.filter(
+  (migration) => migration.version > 3,
+);
 
 async function resetDatabase(pool) {
   const result = await pool.query("select current_database() as name");
@@ -40,34 +52,45 @@ test("audit foundation exposes an append-only PostgreSQL store", async () => {
   );
 });
 
-test("an empty or v3 database upgrades once to the audit migration", async () => {
+test("an empty or v3 database upgrades once to the current migration", async () => {
   const pool = createDatabasePool(readDatabaseConfig(process.env));
   const previous = await mkdtemp(join(tmpdir(), "nop-audit-v3-"));
   try {
     await resetDatabase(pool);
-    const files = (await readdir(migrationDirectory))
-      .filter((file) => /^000[1-3]_.*\.up\.sql$/u.test(file))
-      .sort();
-    for (const file of files) {
-      await copyFile(join(migrationDirectory, file), join(previous, file));
+    const v3Migrations = repositoryMigrations.filter(
+      (migration) => migration.version <= 3,
+    );
+    for (const migration of v3Migrations) {
+      await copyFile(
+        join(migrationDirectory, migration.fileName),
+        join(previous, migration.fileName),
+      );
     }
 
     assert.equal((await applyMigrations(pool, previous)).currentVersion, 3);
     const upgrade = await applyMigrations(pool);
-    assert.equal(upgrade.appliedCount, 1);
-    assert.equal(upgrade.currentVersion, 4);
-    assert.equal((await applyMigrations(pool)).appliedCount, 0);
+    assert.equal(upgrade.appliedCount, upgradeFromV3.length);
+    assert.equal(upgrade.currentVersion, latestMigrationVersion);
+    const repeated = await applyMigrations(pool);
+    assert.equal(repeated.appliedCount, 0);
+    assert.equal(repeated.currentVersion, latestMigrationVersion);
     assert.deepEqual(await getMigrationStatus(pool), {
-      currentVersion: 4,
-      latestVersion: 4,
+      currentVersion: latestMigrationVersion,
+      latestVersion: latestMigrationVersion,
       pendingVersions: [],
       compatible: true,
     });
 
     await resetDatabase(pool);
     const emptyUpgrade = await applyMigrations(pool);
-    assert.equal(emptyUpgrade.appliedCount, 4);
-    assert.equal(emptyUpgrade.currentVersion, 4);
+    assert.equal(emptyUpgrade.appliedCount, repositoryMigrations.length);
+    assert.equal(emptyUpgrade.currentVersion, latestMigrationVersion);
+    assert.deepEqual(await getMigrationStatus(pool), {
+      currentVersion: latestMigrationVersion,
+      latestVersion: latestMigrationVersion,
+      pendingVersions: [],
+      compatible: true,
+    });
   } finally {
     await pool.end();
     await rm(previous, { recursive: true, force: true });
