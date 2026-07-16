@@ -6,7 +6,7 @@ import {
   DatabaseService,
 } from "../../database/database.module.js";
 import { AuditStore } from "../audit/public.js";
-import { readWebSessionConfig } from "../../config/public.js";
+import { readTotpConfig, readWebSessionConfig } from "../../config/public.js";
 import { SessionAuthenticationMiddleware } from "./adapters/http/session-authentication.middleware.js";
 import { BrowserCsrfMiddleware } from "./adapters/http/browser-csrf.middleware.js";
 import { SessionController } from "./adapters/http/session.controller.js";
@@ -18,6 +18,7 @@ import {
   USER_AUTHORIZER,
 } from "./application/authorization.js";
 import { CsrfMetrics, SessionMetrics } from "./application/session.js";
+import { TotpMetrics } from "./application/totp.js";
 
 @Global()
 @Module({
@@ -27,6 +28,7 @@ import { CsrfMetrics, SessionMetrics } from "./application/session.js";
     AuthorizationMetrics,
     SessionMetrics,
     CsrfMetrics,
+    TotpMetrics,
     {
       provide: PostgresAuthorizationService,
       inject: [DatabaseService, AuthorizationMetrics],
@@ -50,8 +52,12 @@ import { CsrfMetrics, SessionMetrics } from "./application/session.js";
     { provide: USER_AUTHORIZER, useExisting: PostgresAuthorizationService },
     {
       provide: PostgresSessionService,
-      inject: [DatabaseService, SessionMetrics],
-      useFactory: (database: DatabaseService, metrics: SessionMetrics) => {
+      inject: [DatabaseService, SessionMetrics, TotpMetrics],
+      useFactory: (
+        database: DatabaseService,
+        metrics: SessionMetrics,
+        totpMetrics: TotpMetrics,
+      ) => {
         let audit: AuditStore | undefined;
         return new PostgresSessionService(
           () => database.pool,
@@ -63,6 +69,8 @@ import { CsrfMetrics, SessionMetrics } from "./application/session.js";
           },
           readWebSessionConfig(),
           metrics,
+          readTotpConfig(),
+          totpMetrics,
         );
       },
     },
@@ -75,6 +83,7 @@ import { CsrfMetrics, SessionMetrics } from "./application/session.js";
     AuthorizationMetrics,
     SessionMetrics,
     CsrfMetrics,
+    TotpMetrics,
     PostgresAuthorizationService,
     PostgresSessionService,
     SessionAuthenticationMiddleware,

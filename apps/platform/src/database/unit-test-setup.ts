@@ -4,3 +4,5 @@ process.env.COLLECTOR_SERVICE_TOKEN ??=
   "t008-test-only-collector-token-not-production";
 process.env.VMALERT_SERVICE_TOKEN ??=
   "t008-test-only-vmalert-token-not-production";
+process.env.TOTP_ENCRYPTION_KEY ??=
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";

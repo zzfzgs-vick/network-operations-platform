@@ -357,6 +357,55 @@ export interface RuntimeShutdownConfig {
   readonly workerShutdownTimeoutMs: number;
 }
 
+export interface TotpConfig {
+  readonly encryptionKey: SecretValue;
+  readonly keyVersion: string;
+  readonly enrollmentTimeoutMs: number;
+  readonly challengeMaxAttempts: number;
+  readonly throttleDurationMs: number;
+}
+
+export function readTotpConfig(
+  environment: Environment = process.env,
+): TotpConfig {
+  const encryptionKey = readSecret(environment, "TOTP_ENCRYPTION_KEY");
+  const encoded = encryptionKey.reveal();
+  const decoded = Buffer.from(encoded, "base64url");
+  if (decoded.byteLength !== 32 || decoded.toString("base64url") !== encoded) {
+    throw new Error("TOTP_ENCRYPTION_KEY must be a 32-byte Base64URL Secret");
+  }
+  return {
+    encryptionKey,
+    keyVersion: stableValue(
+      environment,
+      "TOTP_ENCRYPTION_KEY_VERSION",
+      "v1",
+      64,
+    ),
+    enrollmentTimeoutMs: integer(
+      environment,
+      "TOTP_ENROLLMENT_TIMEOUT_MS",
+      5 * 60 * 1000,
+      60_000,
+      10 * 60 * 1000,
+    ),
+    challengeMaxAttempts: integer(
+      environment,
+      "TOTP_CHALLENGE_MAX_ATTEMPTS",
+      5,
+      1,
+      10,
+    ),
+    throttleDurationMs: integer(
+      environment,
+      "TOTP_THROTTLE_DURATION_MS",
+      30_000,
+      1_000,
+      5 * 60 * 1000,
+    ),
+  };
+}
+
 export interface WebSessionConfig {
   readonly preAuthenticationTimeoutMs: number;
   readonly idleTimeoutMs: number;
@@ -481,4 +530,5 @@ export const loadedConfigurationCategories = [
   "runtime",
   "runtime_health",
   "web_session",
+  "totp",
 ] as const;

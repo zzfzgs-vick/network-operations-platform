@@ -2,7 +2,11 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient } from "pg";
 
-import type { WebSessionConfig } from "../../../../config/public.js";
+import {
+  readTotpConfig,
+  type TotpConfig,
+  type WebSessionConfig,
+} from "../../../../config/public.js";
 import { withTransaction } from "../../../../database/database.js";
 import type { AuditEventInput } from "../../../audit/public.js";
 import { PostgresLocalIdentityService } from "./postgres-local-identity-service.js";
@@ -14,6 +18,16 @@ import {
   type ValidatedWebSession,
   type WebSessionType,
 } from "../../application/session.js";
+import {
+  TotpMetrics,
+  TotpRejectedError,
+  decryptTotpSecret,
+  encryptTotpSecret,
+  newTotpSecret,
+  totpStep,
+  totpUri,
+  validateTotp,
+} from "../../application/totp.js";
 
 interface AuditAppender {
   append(client: PoolClient, input: AuditEventInput): Promise<unknown>;
@@ -35,6 +49,35 @@ interface SessionRow {
   readonly revoked_at: Date | null;
 }
 
+type MfaPurpose = "MFA_ENROLLMENT" | "MFA_VERIFY";
+
+const mfaMetricEvent = (purpose?: MfaPurpose): "enrollment" | "verification" =>
+  purpose === "MFA_ENROLLMENT" ? "enrollment" : "verification";
+
+interface MfaChallengeRow {
+  readonly challenge_id: string;
+  readonly session_id: string;
+  readonly user_id: string;
+  readonly purpose: MfaPurpose;
+  readonly attempt_count: number;
+  readonly max_attempts: number;
+  readonly expires_at: Date;
+  readonly completed_at: Date | null;
+  readonly password_verified_at: Date;
+  readonly authorization_version: string;
+  readonly credential_version: number;
+  readonly username: string;
+}
+
+interface SecretRow {
+  readonly secret_id: string;
+  readonly secret_ciphertext: Buffer;
+  readonly secret_nonce: Buffer;
+  readonly secret_tag: Buffer;
+  readonly key_version: string;
+  readonly last_accepted_step: string | null;
+}
+
 const tokenDigest = (token: string) =>
   createHash("sha256").update(token, "utf8").digest();
 
@@ -50,6 +93,11 @@ const bounded = (
     })
     .join("")
     .slice(0, maximum) || fallback;
+
+const sourceDigest = (source: string) =>
+  createHash("sha256")
+    .update(bounded(source, "unknown", 128))
+    .digest("hex");
 
 export async function revokeUserSessions(
   client: PoolClient,
@@ -94,6 +142,8 @@ export class PostgresSessionService {
     private readonly audit: AuditAppender,
     private readonly config: WebSessionConfig,
     readonly metrics = new SessionMetrics(),
+    private readonly totpConfig: TotpConfig = readTotpConfig(),
+    readonly totpMetrics = new TotpMetrics(),
   ) {}
 
   private get pool() {
@@ -120,8 +170,17 @@ export class PostgresSessionService {
   }): Promise<IssuedWebSession> {
     const user = await this.identity.authenticate(input);
     const needsMfa = await this.hasSensitivePermission(user.userId);
-    const type: WebSessionType =
-      user.mustChangePassword || needsMfa ? "PRE_AUTH" : "AUTHENTICATED";
+    const hasAuthenticator = needsMfa
+      ? await this.hasActiveTotpAuthenticator(user.userId)
+      : false;
+    const nextStep = user.mustChangePassword
+      ? ("PASSWORD_CHANGE" as const)
+      : needsMfa
+        ? hasAuthenticator
+          ? ("MFA_VERIFY" as const)
+          : ("MFA_ENROLLMENT" as const)
+        : undefined;
+    const type: WebSessionType = nextStep ? "PRE_AUTH" : "AUTHENTICATED";
     const token = randomBytes(32).toString("base64url");
     const csrfToken = randomBytes(32).toString("base64url");
     const sessionId = randomUUID();
@@ -202,6 +261,23 @@ export class PostgresSessionService {
           bounded(input.clientSummary, "unspecified", 256),
         ],
       );
+      if (nextStep === "MFA_ENROLLMENT" || nextStep === "MFA_VERIFY") {
+        await client.query(
+          `insert into public.mfa_challenges (
+             challenge_id, session_id, user_id, purpose, source_hash,
+             max_attempts, expires_at
+           ) values ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            randomUUID(),
+            sessionId,
+            user.userId,
+            nextStep,
+            sourceDigest(input.source),
+            this.totpConfig.challengeMaxAttempts,
+            expiresAt,
+          ],
+        );
+      }
       await this.audit.append(client, {
         actor: { type: "USER", id: user.userId },
         eventType: "SESSION.CREATED",
@@ -225,6 +301,7 @@ export class PostgresSessionService {
         token,
         csrfToken,
         expiresAt: expiresAt.toISOString(),
+        ...(nextStep === undefined ? {} : { nextStep }),
       };
     });
     return outcome;
@@ -254,6 +331,386 @@ export class PostgresSessionService {
       [session.sessionId, tokenDigest(csrfToken)],
     );
     return result.rows[0]?.valid ?? false;
+  }
+
+  async beginTotpEnrollment(input: {
+    readonly preAuthenticationToken: string;
+    readonly requestId?: string;
+  }) {
+    const session = await this.validatePreAuthentication(
+      input.preAuthenticationToken,
+      input.requestId,
+    );
+    const enrollmentId = randomUUID();
+    const secret = newTotpSecret();
+    const outcome = await withTransaction(this.pool, async (client) => {
+      const challenge = await client.query<{
+        user_id: string;
+        username: string;
+        expires_at: Date;
+      }>(
+        `select c.user_id, u.username, c.expires_at
+           from public.mfa_challenges c
+           join public.web_sessions s on s.session_id = c.session_id
+           join public.platform_users u on u.user_id = c.user_id
+           join public.local_credentials lc on lc.user_id = c.user_id
+           join public.platform_session_generation g on g.singleton_id = 1
+          where c.session_id = $1 and c.purpose = 'MFA_ENROLLMENT'
+            and c.completed_at is null and s.revoked_at is null
+            and u.status = 'ENABLED'
+            and s.authorization_version = u.authorization_version
+            and s.credential_version = lc.credential_version
+            and s.generation_id = g.generation_id
+            and s.absolute_expires_at > clock_timestamp()
+            and (s.idle_expires_at is null or s.idle_expires_at > clock_timestamp())
+            and c.expires_at > clock_timestamp()
+          for update of c, s, u, lc, g`,
+        [session.sessionId],
+      );
+      const row = challenge.rows[0];
+      if (!row) return undefined;
+      const encrypted = encryptTotpSecret(
+        secret,
+        `enrollment:${row.user_id}:${enrollmentId}`,
+        this.totpConfig,
+      );
+      await client.query(
+        "delete from public.totp_enrollments where user_id = $1",
+        [row.user_id],
+      );
+      await client.query(
+        `insert into public.totp_enrollments (
+           enrollment_id, user_id, secret_ciphertext, secret_nonce,
+           secret_tag, key_version, expires_at
+         ) values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          enrollmentId,
+          row.user_id,
+          encrypted.ciphertext,
+          encrypted.nonce,
+          encrypted.tag,
+          encrypted.keyVersion,
+          row.expires_at,
+        ],
+      );
+      await this.audit.append(client, {
+        actor: { type: "USER", id: row.user_id },
+        eventType: "MFA.ENROLLMENT_STARTED",
+        source: "totp",
+        outcome: "SUCCESS",
+        resource: { type: "totp-enrollment", id: enrollmentId },
+        ...(input.requestId === undefined
+          ? {}
+          : { requestId: input.requestId }),
+      });
+      return {
+        secret,
+        uri: totpUri(secret, row.username),
+        expiresAt: row.expires_at.toISOString(),
+      };
+    });
+    if (!outcome) {
+      this.totpMetrics.record("enrollment", "invalid");
+      throw new TotpRejectedError("enrollment-required");
+    }
+    this.totpMetrics.record("enrollment", "started");
+    return outcome;
+  }
+
+  async completeTotp(input: {
+    readonly preAuthenticationToken: string;
+    readonly code: string;
+    readonly source: string;
+    readonly clientSummary?: string;
+    readonly requestId?: string;
+  }): Promise<IssuedWebSession> {
+    const session = await this.validatePreAuthentication(
+      input.preAuthenticationToken,
+      input.requestId,
+    );
+    const sourceHash = sourceDigest(input.source);
+    const token = randomBytes(32).toString("base64url");
+    const csrfToken = randomBytes(32).toString("base64url");
+    const nextSessionId = randomUUID();
+    const outcome = await withTransaction(this.pool, async (client) => {
+      const challenge = await client.query<MfaChallengeRow>(
+        `select c.challenge_id, c.session_id, c.user_id, c.purpose,
+                c.attempt_count, c.max_attempts, c.expires_at, c.completed_at,
+                s.password_verified_at, u.authorization_version,
+                lc.credential_version, u.username
+           from public.mfa_challenges c
+           join public.web_sessions s on s.session_id = c.session_id
+           join public.platform_users u on u.user_id = c.user_id
+           join public.local_credentials lc on lc.user_id = c.user_id
+           join public.platform_session_generation g on g.singleton_id = 1
+          where c.session_id = $1 and c.completed_at is null
+            and s.revoked_at is null and s.session_type = 'PRE_AUTH'
+            and u.status = 'ENABLED'
+            and s.authorization_version = u.authorization_version
+            and s.credential_version = lc.credential_version
+            and s.generation_id = g.generation_id
+            and s.absolute_expires_at > clock_timestamp()
+            and (s.idle_expires_at is null or s.idle_expires_at > clock_timestamp())
+          for update of c, s, u, lc, g`,
+        [session.sessionId],
+      );
+      const row = challenge.rows[0];
+      const now = await this.databaseNow(client);
+      if (!row || row.expires_at <= now) {
+        if (row)
+          await this.appendMfaFailure(client, row, "challenge-expired", input);
+        return {
+          rejected: "challenge-expired" as const,
+          event: mfaMetricEvent(row?.purpose),
+        };
+      }
+      if (row.attempt_count >= row.max_attempts) {
+        return {
+          rejected: "throttled" as const,
+          event: mfaMetricEvent(row.purpose),
+        };
+      }
+      const throttled = await client.query<{ locked: boolean }>(
+        `select exists (
+           select 1 from public.totp_source_auth_throttle
+            where source_hash = $2
+              and locked_until > clock_timestamp()
+           union all
+           select 1 from public.totp_user_auth_throttle
+            where user_id = $1 and locked_until > clock_timestamp()
+         ) as locked`,
+        [row.user_id, sourceHash],
+      );
+      if (throttled.rows[0]?.locked) {
+        return {
+          rejected: "throttled" as const,
+          event: mfaMetricEvent(row.purpose),
+        };
+      }
+
+      const secretResult =
+        row.purpose === "MFA_ENROLLMENT"
+          ? await client.query<SecretRow>(
+              `select enrollment_id as secret_id, secret_ciphertext,
+                      secret_nonce, secret_tag, key_version,
+                      null::bigint as last_accepted_step
+                 from public.totp_enrollments
+                where user_id = $1 and expires_at > clock_timestamp()
+                for update`,
+              [row.user_id],
+            )
+          : await client.query<SecretRow>(
+              `select authenticator_id as secret_id, secret_ciphertext,
+                      secret_nonce, secret_tag, key_version, last_accepted_step
+                 from public.totp_authenticators
+                where user_id = $1 and status = 'ACTIVE'
+                for update`,
+              [row.user_id],
+            );
+      const stored = secretResult.rows[0];
+      if (!stored) {
+        await this.appendMfaFailure(client, row, "enrollment-required", input);
+        return {
+          rejected: "enrollment-required" as const,
+          event: mfaMetricEvent(row.purpose),
+        };
+      }
+      const binding =
+        row.purpose === "MFA_ENROLLMENT"
+          ? `enrollment:${row.user_id}:${stored.secret_id}`
+          : `authenticator:${row.user_id}:${stored.secret_id}`;
+      const secret = decryptTotpSecret(
+        {
+          ciphertext: stored.secret_ciphertext,
+          nonce: stored.secret_nonce,
+          tag: stored.secret_tag,
+          keyVersion: stored.key_version,
+        },
+        binding,
+        this.totpConfig,
+      );
+      const delta = validateTotp(secret, input.code, now.getTime());
+      const acceptedStep =
+        delta === null ? undefined : totpStep(now.getTime()) + delta;
+      const replay =
+        acceptedStep !== undefined &&
+        stored.last_accepted_step !== null &&
+        Number(stored.last_accepted_step) >= acceptedStep;
+      if (acceptedStep === undefined || replay) {
+        const reason = replay ? "replay" : "invalid";
+        const throttledNow = await this.recordTotpFailure(
+          client,
+          row,
+          sourceHash,
+        );
+        const rejection = throttledNow ? "throttled" : reason;
+        await this.appendMfaFailure(client, row, rejection, input);
+        return {
+          rejected: rejection,
+          event: mfaMetricEvent(row.purpose),
+        } as const;
+      }
+
+      let authorizationVersion = Number(row.authorization_version);
+      if (row.purpose === "MFA_ENROLLMENT") {
+        const authenticatorId = randomUUID();
+        const encrypted = encryptTotpSecret(
+          secret,
+          `authenticator:${row.user_id}:${authenticatorId}`,
+          this.totpConfig,
+        );
+        await client.query(
+          `insert into public.totp_authenticators (
+             authenticator_id, user_id, secret_ciphertext, secret_nonce,
+             secret_tag, key_version, status, last_accepted_step, verified_at
+           ) values ($1, $2, $3, $4, $5, $6, 'ACTIVE', $7, $8)`,
+          [
+            authenticatorId,
+            row.user_id,
+            encrypted.ciphertext,
+            encrypted.nonce,
+            encrypted.tag,
+            encrypted.keyVersion,
+            acceptedStep,
+            now,
+          ],
+        );
+        await client.query(
+          "delete from public.totp_enrollments where enrollment_id = $1",
+          [stored.secret_id],
+        );
+        const updated = await client.query<{ authorization_version: string }>(
+          `update public.platform_users
+              set mfa_state = 'ENROLLED',
+                  authorization_version = authorization_version + 1,
+                  updated_at = clock_timestamp()
+            where user_id = $1
+            returning authorization_version`,
+          [row.user_id],
+        );
+        authorizationVersion = Number(updated.rows[0]!.authorization_version);
+      } else {
+        await client.query(
+          `update public.totp_authenticators
+              set last_accepted_step = $2
+            where authenticator_id = $1 and status = 'ACTIVE'`,
+          [stored.secret_id, acceptedStep],
+        );
+      }
+      await client.query(
+        "delete from public.totp_user_auth_throttle where user_id = $1",
+        [row.user_id],
+      );
+      await client.query(
+        "update public.mfa_challenges set completed_at = $2 where challenge_id = $1",
+        [row.challenge_id, now],
+      );
+      if (row.purpose === "MFA_ENROLLMENT") {
+        await client.query(
+          `update public.web_sessions
+              set revoked_at = clock_timestamp(),
+                  revocation_reason = 'AUTHORIZATION_CHANGED'
+            where user_id = $1 and revoked_at is null`,
+          [row.user_id],
+        );
+      } else {
+        await client.query(
+          `update public.web_sessions
+              set revoked_at = clock_timestamp(), revocation_reason = 'ROTATED'
+            where session_id = $1 and revoked_at is null`,
+          [row.session_id],
+        );
+      }
+      const expiresAt = new Date(now.getTime() + this.config.absoluteTimeoutMs);
+      const idleExpiresAt = new Date(
+        Math.min(
+          now.getTime() + this.config.idleTimeoutMs,
+          expiresAt.getTime(),
+        ),
+      );
+      const generation = await client.query<{ generation_id: string }>(
+        "select generation_id from public.platform_session_generation where singleton_id = 1",
+      );
+      await client.query(
+        `insert into public.web_sessions (
+           session_id, user_id, session_type, token_hash, csrf_token_hash,
+           generation_id, authorization_version, credential_version,
+           authentication_strength, password_verified_at, mfa_verified_at,
+           last_activity_at, idle_expires_at, absolute_expires_at, request_id,
+           source_address, user_agent_summary
+         ) values (
+           $1, $2, 'AUTHENTICATED', $3, $4, $5, $6, $7, 'PASSWORD_MFA',
+           $8, $9, $9, $10, $11, $12, $13, $14
+         )`,
+        [
+          nextSessionId,
+          row.user_id,
+          tokenDigest(token),
+          tokenDigest(csrfToken),
+          generation.rows[0]!.generation_id,
+          authorizationVersion,
+          row.credential_version,
+          row.password_verified_at,
+          now,
+          idleExpiresAt,
+          expiresAt,
+          input.requestId ?? null,
+          bounded(input.source, "unknown", 128),
+          bounded(input.clientSummary, "unspecified", 256),
+        ],
+      );
+      await this.audit.append(client, {
+        actor: { type: "USER", id: row.user_id },
+        eventType:
+          row.purpose === "MFA_ENROLLMENT"
+            ? "MFA.ENROLLMENT_COMPLETED"
+            : "MFA.VERIFICATION_SUCCEEDED",
+        source: "totp",
+        outcome: "SUCCESS",
+        resource: { type: "platform-user", id: row.user_id },
+        ...(input.requestId === undefined
+          ? {}
+          : { requestId: input.requestId }),
+      });
+      await this.audit.append(client, {
+        actor: { type: "USER", id: row.user_id },
+        eventType: "SESSION.MFA_CREATED",
+        source: "web-session",
+        outcome: "SUCCESS",
+        resource: { type: "web-session", id: nextSessionId },
+        ...(input.requestId === undefined
+          ? {}
+          : { requestId: input.requestId }),
+      });
+      return {
+        issued: {
+          sessionId: nextSessionId,
+          type: "AUTHENTICATED" as const,
+          token,
+          csrfToken,
+          expiresAt: expiresAt.toISOString(),
+        },
+        event: mfaMetricEvent(row.purpose),
+        clockSkew: delta !== 0,
+      };
+    });
+    if ("rejected" in outcome) {
+      const metricOutcome =
+        outcome.rejected === "challenge-expired"
+          ? "expired"
+          : outcome.rejected === "enrollment-required"
+            ? "invalid"
+            : outcome.rejected;
+      this.totpMetrics.record(outcome.event, metricOutcome);
+      throw new TotpRejectedError(outcome.rejected);
+    }
+    this.totpMetrics.record(outcome.event, "success");
+    if (outcome.clockSkew) {
+      this.totpMetrics.record(outcome.event, "clock-skew");
+    }
+    this.metrics.record("rotated", "explicit");
+    this.metrics.record("created", "authenticated");
+    return outcome.issued;
   }
 
   async recordUserActivity(token: string, requestId?: string) {
@@ -464,6 +921,104 @@ export class PostgresSessionService {
       [userId],
     );
     return result.rows[0]?.required ?? false;
+  }
+
+  private async hasActiveTotpAuthenticator(userId: string) {
+    const result = await this.pool.query<{ active: boolean }>(
+      `select exists (
+         select 1 from public.totp_authenticators
+          where user_id = $1 and status = 'ACTIVE'
+       ) as active`,
+      [userId],
+    );
+    return result.rows[0]?.active ?? false;
+  }
+
+  private async recordTotpFailure(
+    client: PoolClient,
+    challenge: MfaChallengeRow,
+    sourceHash: string,
+  ) {
+    const attempt = await client.query<{ attempt_count: number }>(
+      `update public.mfa_challenges
+          set attempt_count = least(max_attempts, attempt_count + 1)
+        where challenge_id = $1
+        returning attempt_count`,
+      [challenge.challenge_id],
+    );
+    const sourceThrottle = await client.query<{ locked: boolean }>(
+      `insert into public.totp_source_auth_throttle
+         (source_hash, failure_count, locked_until)
+       values ($1, 1, null)
+       on conflict (source_hash) do update set
+         failure_count = case
+           when public.totp_source_auth_throttle.updated_at <
+                clock_timestamp() - ($3::integer * interval '1 millisecond')
+             then 1
+           else least(100, public.totp_source_auth_throttle.failure_count + 1)
+         end,
+         locked_until = case
+           when public.totp_source_auth_throttle.updated_at <
+                clock_timestamp() - ($3::integer * interval '1 millisecond')
+             then null
+           when public.totp_source_auth_throttle.failure_count + 1 >= $2
+             then clock_timestamp() + ($3::integer * interval '1 millisecond')
+           else public.totp_source_auth_throttle.locked_until
+         end,
+         updated_at = clock_timestamp()
+       returning coalesce(locked_until > clock_timestamp(), false) as locked`,
+      [sourceHash, challenge.max_attempts, this.totpConfig.throttleDurationMs],
+    );
+    const userThrottle = await client.query<{ locked: boolean }>(
+      `insert into public.totp_user_auth_throttle
+         (user_id, failure_count, locked_until)
+       values ($1, 1, null)
+       on conflict (user_id) do update set
+         failure_count = least(100, public.totp_user_auth_throttle.failure_count + 1),
+         locked_until = case
+           when public.totp_user_auth_throttle.failure_count + 1 >= $2
+             then clock_timestamp() + ($3::integer * interval '1 millisecond')
+           else public.totp_user_auth_throttle.locked_until
+         end,
+         updated_at = clock_timestamp()
+       returning coalesce(locked_until > clock_timestamp(), false) as locked`,
+      [
+        challenge.user_id,
+        challenge.max_attempts,
+        this.totpConfig.throttleDurationMs,
+      ],
+    );
+    return (
+      (attempt.rows[0]?.attempt_count ?? 0) >= challenge.max_attempts ||
+      (sourceThrottle.rows[0]?.locked ?? false) ||
+      (userThrottle.rows[0]?.locked ?? false)
+    );
+  }
+
+  private appendMfaFailure(
+    client: PoolClient,
+    challenge: MfaChallengeRow,
+    reason:
+      | "invalid"
+      | "replay"
+      | "throttled"
+      | "enrollment-required"
+      | "challenge-expired",
+    input: { readonly requestId?: string },
+  ) {
+    return this.audit.append(client, {
+      actor: { type: "USER", id: challenge.user_id },
+      eventType:
+        challenge.purpose === "MFA_ENROLLMENT"
+          ? "MFA.ENROLLMENT_FAILED"
+          : "MFA.VERIFICATION_FAILED",
+      source: "totp",
+      outcome: "DENIED",
+      failureCategory: "MFA_REJECTED",
+      resource: { type: "mfa-challenge", id: challenge.challenge_id },
+      ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
+      details: { reasonCategory: reason },
+    });
   }
 
   private async databaseNow(client: PoolClient) {

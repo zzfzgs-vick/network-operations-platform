@@ -38,3 +38,7 @@ single recovery generation marker. Raw session tokens are never persisted.
 
 `0008_csrf_session_foundation.up.sql` adds a per-session SHA-256-digested CSRF token. Existing
 active sessions are revoked during upgrade because they cannot prove possession of the new token.
+
+`0009_totp_enrollment_login.up.sql` owns permission-driven MFA state, encrypted pending TOTP
+enrollment, one active TOTP authenticator per user, bounded MFA challenges, replay state, and an
+independent user/source throttle. Encryption keys remain outside PostgreSQL and Git.

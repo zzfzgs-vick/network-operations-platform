@@ -13,6 +13,7 @@ if (
     "csrf",
     "password-policy",
     "session-cookie",
+    "totp",
   ].includes(selections[0])
 ) {
   throw new Error(`Unknown security test selection: ${selections.join(" ")}`);
@@ -36,6 +37,7 @@ const testFileBySelection = {
   authorization: "tests/integration/authz/authorization.test.mjs",
   "password-policy": "tests/integration/auth/password-policy.test.mjs",
   "session-cookie": "tests/integration/session/session-cookie.test.mjs",
+  totp: "tests/integration/mfa/totp.test.mjs",
 };
 const testFile = testFileBySelection[selections[0]];
 

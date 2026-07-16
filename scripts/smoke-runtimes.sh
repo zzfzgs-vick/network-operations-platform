@@ -76,13 +76,19 @@ export WORKER_HEARTBEAT_STALE_AFTER_MS=5000
 export WORKER_INSTANCE_ID=platform-worker-smoke
 collector_service_token="t008-test-only-collector-token-not-production"
 vmalert_service_token="t008-test-only-vmalert-token-not-production"
+totp_encryption_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+totp_key_version="t015-test-only-v1"
 
 dependency_health_verified=false
 if docker_available; then
   COLLECTOR_SERVICE_TOKEN="$collector_service_token" \
   VMALERT_SERVICE_TOKEN="$vmalert_service_token" \
+  TOTP_ENCRYPTION_KEY="$totp_encryption_key" \
+  TOTP_ENCRYPTION_KEY_VERSION="$totp_key_version" \
     npm run test:integration --workspace apps/platform -- service-auth
-  npm run test:integration --workspace apps/platform -- platform-health
+  TOTP_ENCRYPTION_KEY="$totp_encryption_key" \
+  TOTP_ENCRYPTION_KEY_VERSION="$totp_key_version" \
+    npm run test:integration --workspace apps/platform -- platform-health
   npm run db:migrate --workspace apps/platform
   dependency_health_verified=true
   export NODE_ENV=development
@@ -133,6 +139,8 @@ env \
   -u VMALERT_SERVICE_PREVIOUS_TOKEN_FILE \
   COLLECTOR_SERVICE_TOKEN="$collector_service_token" \
   VMALERT_SERVICE_TOKEN="$vmalert_service_token" \
+  TOTP_ENCRYPTION_KEY="$totp_encryption_key" \
+  TOTP_ENCRYPTION_KEY_VERSION="$totp_key_version" \
   HOST=127.0.0.1 PORT="$api_port" \
   node "$root/apps/platform/dist/main.js" >"$tmp/api.log" 2>&1 &
 api_pid=$!
@@ -147,6 +155,9 @@ env \
   -u VMALERT_SERVICE_TOKEN_FILE \
   -u VMALERT_SERVICE_PREVIOUS_TOKEN \
   -u VMALERT_SERVICE_PREVIOUS_TOKEN_FILE \
+  -u TOTP_ENCRYPTION_KEY \
+  -u TOTP_ENCRYPTION_KEY_FILE \
+  -u TOTP_ENCRYPTION_KEY_VERSION \
   PORT="$worker_probe_port" \
   node "$root/apps/platform/dist/worker.js" >"$tmp/worker.log" 2>&1 &
 worker_pid=$!

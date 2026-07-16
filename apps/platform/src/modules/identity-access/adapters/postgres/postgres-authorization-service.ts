@@ -238,6 +238,7 @@ export class PostgresAuthorizationService implements UserAuthorizer {
           return current;
         }
         await this.replacePermissions(client, input.roleId, permissions);
+        await this.refreshAssignedUserMfaStates(client, input.roleId);
         const revokedSessions = await this.incrementAssignedUserVersions(
           client,
           input.roleId,
@@ -288,6 +289,7 @@ export class PostgresAuthorizationService implements UserAuthorizer {
           [input.userId, input.roleId, input.actor.userId],
         );
         if (inserted.rowCount === 1) {
+          await this.refreshUserMfaState(client, input.userId);
           await this.incrementUserVersion(client, input.userId);
           await revokeUserSessions(client, this.audit, {
             userId: input.userId,
@@ -325,6 +327,7 @@ export class PostgresAuthorizationService implements UserAuthorizer {
           [input.userId, input.roleId],
         );
         if (removed.rowCount === 1) {
+          await this.refreshUserMfaState(client, input.userId);
           await this.incrementUserVersion(client, input.userId);
           await revokeUserSessions(client, this.audit, {
             userId: input.userId,
@@ -575,6 +578,55 @@ export class PostgresAuthorizationService implements UserAuthorizer {
       [roleId],
     );
     return revoked.rowCount ?? 0;
+  }
+
+  private refreshAssignedUserMfaStates(client: PoolClient, roleId: string) {
+    return client.query(
+      `update public.platform_users u
+          set mfa_state = case
+            when exists (
+              select 1 from public.totp_authenticators a
+               where a.user_id = u.user_id and a.status = 'ACTIVE'
+            ) then 'ENROLLED'
+            when exists (
+              select 1
+                from public.user_role_assignments ura
+                join public.role_permissions rp on rp.role_id = ura.role_id
+                join public.permissions p on p.permission_code = rp.permission_code
+               where ura.user_id = u.user_id and p.sensitive
+            ) then 'MFA_ENROLLMENT_REQUIRED'
+            else 'NOT_REQUIRED'
+          end,
+          updated_at = clock_timestamp()
+        where exists (
+          select 1 from public.user_role_assignments ura
+           where ura.role_id = $1 and ura.user_id = u.user_id
+        )`,
+      [roleId],
+    );
+  }
+
+  private refreshUserMfaState(client: PoolClient, userId: string) {
+    return client.query(
+      `update public.platform_users u
+          set mfa_state = case
+            when exists (
+              select 1 from public.totp_authenticators a
+               where a.user_id = u.user_id and a.status = 'ACTIVE'
+            ) then 'ENROLLED'
+            when exists (
+              select 1
+                from public.user_role_assignments ura
+                join public.role_permissions rp on rp.role_id = ura.role_id
+                join public.permissions p on p.permission_code = rp.permission_code
+               where ura.user_id = u.user_id and p.sensitive
+            ) then 'MFA_ENROLLMENT_REQUIRED'
+            else 'NOT_REQUIRED'
+          end,
+          updated_at = clock_timestamp()
+        where u.user_id = $1`,
+      [userId],
+    );
   }
 
   private async incrementUserVersion(client: PoolClient, userId: string) {

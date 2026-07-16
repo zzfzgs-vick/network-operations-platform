@@ -58,10 +58,18 @@ if (selections.length !== 1) {
 
 if (selections[0] === "platform-health") {
   try {
-    run(process.execPath, [
-      "tests/integration/health/run.mjs",
-      "platform-health",
-    ]);
+    run(
+      process.execPath,
+      ["tests/integration/health/run.mjs", "platform-health"],
+      {
+        env: {
+          ...process.env,
+          TOTP_ENCRYPTION_KEY:
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          TOTP_ENCRYPTION_KEY_VERSION: "test-v1",
+        },
+      },
+    );
   } finally {
     rmSync(resolve(root, "apps/platform/dist"), {
       recursive: true,
@@ -71,15 +79,18 @@ if (selections[0] === "platform-health") {
 } else if (
   selections[0] === "service-auth" ||
   selections[0] === "login" ||
+  selections[0] === "mfa-login" ||
   selections[0] === "csrf" ||
   selections[0] === "session-lifecycle"
 ) {
   const ticket =
     selections[0] === "login"
       ? "t013"
-      : selections[0] === "csrf" || selections[0] === "session-lifecycle"
-        ? "t014"
-        : "t008";
+      : selections[0] === "mfa-login"
+        ? "t015"
+        : selections[0] === "csrf" || selections[0] === "session-lifecycle"
+          ? "t014"
+          : "t008";
   const database = `nop_${ticket}_${randomUUID().replaceAll("-", "")}`;
   const databaseUser = process.env.DATABASE_USER ?? "nop";
   const compose = (args) =>
@@ -104,6 +115,8 @@ if (selections[0] === "platform-health") {
       VMALERT_SERVICE_TOKEN: "t008-test-only-vmalert-token-not-production",
       WEB_ORIGIN: "https://network-operations.test",
       SESSION_REVALIDATION_INTERVAL_MS: "100",
+      TOTP_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      TOTP_ENCRYPTION_KEY_VERSION: "test-v1",
     };
     run(process.execPath, ["apps/platform/dist/migrate.js", "up"], {
       env: environment,
@@ -111,11 +124,13 @@ if (selections[0] === "platform-health") {
     runTests(
       selections[0] === "login"
         ? "tests/integration/session/login.test.mjs"
-        : selections[0] === "csrf"
-          ? "tests/integration/session/csrf.test.mjs"
-          : selections[0] === "session-lifecycle"
-            ? "tests/integration/session/session-lifecycle.test.mjs"
-            : "tests/integration/config/service-auth.test.mjs",
+        : selections[0] === "mfa-login"
+          ? "tests/integration/mfa/mfa-login.test.mjs"
+          : selections[0] === "csrf"
+            ? "tests/integration/session/csrf.test.mjs"
+            : selections[0] === "session-lifecycle"
+              ? "tests/integration/session/session-lifecycle.test.mjs"
+              : "tests/integration/config/service-auth.test.mjs",
       environment,
     );
   } finally {

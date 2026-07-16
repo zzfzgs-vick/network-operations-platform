@@ -131,13 +131,30 @@ $env:PLATFORM_HEALTH_TIMEOUT_MS = '2000'
 $env:WORKER_HEARTBEAT_INTERVAL_MS = '1000'
 $env:WORKER_HEARTBEAT_STALE_AFTER_MS = '5000'
 $env:WORKER_INSTANCE_ID = 'platform-worker-smoke'
+$totpEncryptionKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+$totpKeyVersion = 't015-test-only-v1'
+$totpSecretNames = @(
+    'TOTP_ENCRYPTION_KEY',
+    'TOTP_ENCRYPTION_KEY_FILE',
+    'TOTP_ENCRYPTION_KEY_VERSION'
+)
 
 $dependencyHealthVerified = Test-DockerRuntime
 if ($dependencyHealthVerified) {
-    npm run test:integration --workspace apps/platform -- service-auth
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    npm run test:integration --workspace apps/platform -- platform-health
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $previousTotpKey = $env:TOTP_ENCRYPTION_KEY
+    $previousTotpVersion = $env:TOTP_ENCRYPTION_KEY_VERSION
+    try {
+        $env:TOTP_ENCRYPTION_KEY = $totpEncryptionKey
+        $env:TOTP_ENCRYPTION_KEY_VERSION = $totpKeyVersion
+        npm run test:integration --workspace apps/platform -- service-auth
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        npm run test:integration --workspace apps/platform -- platform-health
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    finally {
+        $env:TOTP_ENCRYPTION_KEY = $previousTotpKey
+        $env:TOTP_ENCRYPTION_KEY_VERSION = $previousTotpVersion
+    }
     npm run db:migrate --workspace apps/platform
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
@@ -233,13 +250,15 @@ try {
             PORT = [string] $apiPort
             COLLECTOR_SERVICE_TOKEN = $collectorServiceToken
             VMALERT_SERVICE_TOKEN = $vmAlertServiceToken
+            TOTP_ENCRYPTION_KEY = $totpEncryptionKey
+            TOTP_ENCRYPTION_KEY_VERSION = $totpKeyVersion
         })
     $processes.Add($api)
 
     $worker = Start-RuntimeProcess -FilePath $node -ArgumentList @(
         (Join-Path $platformDirectory 'dist/worker.js')
     ) -WorkingDirectory $platformDirectory `
-        -RemoveEnvironment $serviceSecretNames `
+        -RemoveEnvironment ($serviceSecretNames + $totpSecretNames) `
         -Environment ($platformEnvironment + @{
             PORT = [string] $workerProbePort
         })

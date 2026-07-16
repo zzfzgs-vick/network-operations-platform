@@ -31,6 +31,7 @@ import {
   CsrfMetrics,
   PublicEndpoint,
   SessionMetrics,
+  TotpMetrics,
 } from "../identity-access/public.js";
 import { SessionSseMetrics } from "../sse/session-sse.js";
 import {
@@ -211,6 +212,7 @@ class PlatformHealthController {
     private readonly serviceAuthentication: ServiceAuthenticationMetrics,
     private readonly authorization: AuthorizationMetrics,
     private readonly sessions: SessionMetrics,
+    private readonly totp: TotpMetrics,
     private readonly csrf: CsrfMetrics,
     private readonly sse: SessionSseMetrics,
   ) {}
@@ -246,6 +248,7 @@ class PlatformHealthController {
     const authenticationFailures = this.serviceAuthentication.snapshot();
     const authorizationDecisions = this.authorization.snapshot();
     const sessionEvents = this.sessions.snapshot();
+    const totpEvents = this.totp.snapshot();
     const csrfRejections = this.csrf.snapshot();
     const sseClosures = this.sse.snapshot();
     const lines = [
@@ -290,6 +293,12 @@ class PlatformHealthController {
       ...sessionEvents.map(
         (item) =>
           `nop_web_session_events_total{event="${item.event}",reason="${item.reason}"} ${item.count}`,
+      ),
+      "# HELP nop_totp_events_total TOTP enrollment and verification outcomes by bounded category.",
+      "# TYPE nop_totp_events_total counter",
+      ...totpEvents.map(
+        (item) =>
+          `nop_totp_events_total{event="${item.event}",outcome="${item.outcome}"} ${item.count}`,
       ),
       "# HELP nop_csrf_rejections_total Browser CSRF rejections by bounded reason.",
       "# TYPE nop_csrf_rejections_total counter",

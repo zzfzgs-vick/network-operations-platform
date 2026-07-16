@@ -37,6 +37,14 @@ export {
 } from "./application/session.js";
 export { PostgresSessionService } from "./adapters/postgres/postgres-session-service.js";
 export {
+  TOTP_POLICY,
+  TotpMetrics,
+  TotpRejectedError,
+  createTotp,
+  newTotpSecret,
+  validateTotp,
+} from "./application/totp.js";
+export {
   PublicEndpoint,
   RequirePermission,
   attachAuthenticatedUser,

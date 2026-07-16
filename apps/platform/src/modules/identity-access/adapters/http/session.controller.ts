@@ -13,6 +13,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { requestIdFrom } from "../../../../http/request-id.js";
 import { AuthenticationRejectedError } from "../../application/authentication-provider.js";
 import { SessionRejectedError } from "../../application/session.js";
+import { TotpRejectedError } from "../../application/totp.js";
 import { PostgresSessionService } from "../postgres/postgres-session-service.js";
 import { PublicEndpoint } from "./permission.guard.js";
 import {
@@ -37,6 +38,19 @@ function credentials(body: unknown) {
     throw new BadRequestException("Login request is invalid");
   }
   return { username: body.username, password: body.password };
+}
+
+function totpCode(body: unknown) {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("code" in body) ||
+    typeof body.code !== "string" ||
+    !/^\d{6}$/u.test(body.code)
+  ) {
+    throw new BadRequestException("TOTP request is invalid");
+  }
+  return body.code;
 }
 
 @Controller("api/auth")
@@ -79,11 +93,92 @@ export class SessionController {
             ? "PRE_AUTHENTICATION_REQUIRED"
             : "AUTHENTICATED",
         expiresAt: session.expiresAt,
+        ...(session.nextStep === undefined
+          ? {}
+          : { nextStep: session.nextStep }),
         requestId: requestIdFrom(request),
       };
     } catch (error) {
       if (
         error instanceof AuthenticationRejectedError ||
+        error instanceof SessionRejectedError
+      ) {
+        throw new UnauthorizedException("Authentication failed");
+      }
+      throw error;
+    }
+  }
+
+  @Post("mfa/enrollment")
+  @HttpCode(200)
+  @PublicEndpoint()
+  async beginTotpEnrollment(
+    @Req() request: IncomingMessage,
+    @Res({ passthrough: true }) response: ServerResponse,
+  ) {
+    const preAuthenticationToken = cookieValue(
+      request.headers.cookie,
+      PRE_AUTHENTICATION_COOKIE,
+    );
+    if (!preAuthenticationToken)
+      throw new UnauthorizedException("Authentication failed");
+    try {
+      const enrollment = await this.sessions.beginTotpEnrollment({
+        preAuthenticationToken,
+        requestId: requestIdFrom(request),
+      });
+      response.setHeader("Cache-Control", "no-store");
+      return { ...enrollment, requestId: requestIdFrom(request) };
+    } catch (error) {
+      if (
+        error instanceof TotpRejectedError ||
+        error instanceof SessionRejectedError
+      ) {
+        throw new UnauthorizedException("Authentication failed");
+      }
+      throw error;
+    }
+  }
+
+  @Post("mfa/verify")
+  @HttpCode(200)
+  @PublicEndpoint()
+  async verifyTotp(
+    @Body() body: unknown,
+    @Req() request: IncomingMessage,
+    @Res({ passthrough: true }) response: ServerResponse,
+  ) {
+    const preAuthenticationToken = cookieValue(
+      request.headers.cookie,
+      PRE_AUTHENTICATION_COOKIE,
+    );
+    if (!preAuthenticationToken)
+      throw new UnauthorizedException("Authentication failed");
+    try {
+      const session = await this.sessions.completeTotp({
+        preAuthenticationToken,
+        code: totpCode(body),
+        source: request.socket.remoteAddress ?? "unknown",
+        clientSummary:
+          typeof request.headers["user-agent"] === "string"
+            ? request.headers["user-agent"]
+            : "unspecified",
+        requestId: requestIdFrom(request),
+      });
+      response.setHeader("Set-Cookie", [
+        ...clearedSessionCookies(),
+        sessionCookie(session),
+      ]);
+      response.setHeader("X-CSRF-Token", session.csrfToken);
+      response.setHeader("Cache-Control", "no-store");
+      return {
+        status: "AUTHENTICATED",
+        expiresAt: session.expiresAt,
+        requestId: requestIdFrom(request),
+      };
+    } catch (error) {
+      if (
+        error instanceof TotpRejectedError ||
         error instanceof SessionRejectedError
       ) {
         throw new UnauthorizedException("Authentication failed");
