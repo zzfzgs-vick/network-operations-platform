@@ -23,9 +23,9 @@ flowchart TD
     T010["T010 DONE · 追加式审计基础"]
     T011["T011 DONE · 本地用户、密码与初始化"]
     T012["T012 DONE · 权限集合与 RBAC"]
-    T013["T013 READY · PostgreSQL 不透明会话"]
-    T014["T014 CSRF 与会话/SSE 生命周期"]
-    T015["T015 TOTP 注册与登录"]
+    T013["T013 DONE · PostgreSQL 不透明会话"]
+    T014["T014 READY · CSRF 与会话/SSE 生命周期"]
+    T015["T015 READY · TOTP 注册与登录"]
     T016["T016 MFA 恢复与 break-glass"]
     T017["T017 认证安全验收"]
   end
@@ -244,16 +244,16 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001～T012 已完成，当前先执行 T013。
+- T001～T013 已完成；T014 与 T015 的前置依赖均已满足，可以并行实施，但每次实现会话仍只执行一张 Ticket。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
 - T047 后拓扑 T048、详情 T049 与已具备 API 的 T050 可并行，汇合到 T051。
 - Phase 10 中 T055/T057 与 T058 的准备路径部分并行；T060 只在 T054、T056、T057、T059 全部 DONE 后开始。
 
-## 当前首个可执行 Ticket
+## 当前可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T012：权限集合与默认拒绝 RBAC](T012-permission-rbac-enforcement.md) 已为 DONE。[T013：PostgreSQL 不透明会话与本地登录](T013-postgres-opaque-session-login.md) 的全部前置依赖均已完成，因此是当前唯一 READY Ticket。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T013：PostgreSQL 不透明会话与本地登录](T013-postgres-opaque-session-login.md) 已为 DONE。[T014：CSRF、防后台续期与 SSE 会话生命周期](T014-csrf-session-sse-lifecycle.md) 与 [T015：TOTP 注册、验证与敏感权限门控](T015-totp-enrollment-login.md) 的全部前置依赖均已完成，因此两者均为 READY。
 
 ## DAG 检查规则
 

@@ -1,7 +1,7 @@
 # T014：CSRF、防后台续期与 SSE 会话生命周期
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 完成同源 Cookie 会话的 CSRF、防被动续期和长连接撤销语义。
@@ -71,4 +71,3 @@ CSRF 拒绝、SSE 关闭原因、空闲/绝对到期计数。
 ## 后续 Ticket
 - [T015](T015-totp-enrollment-login.md)
 - T051
-

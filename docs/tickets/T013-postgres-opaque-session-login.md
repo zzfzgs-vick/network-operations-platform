@@ -2,7 +2,17 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- 完成日期：2026-07-16。
+- 对应 Git Commit：实现 `63469b8336605daf6ca43a7b89f397db463dcd48`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29500803109`；Ubuntu 24.04 与 Windows 均通过；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29500803109>。
+- 数据库迁移：`0007_postgres_opaque_sessions.up.sql`，建立 `web_sessions` 与灾难恢复 Session Generation。
+- Token 与 Cookie：使用 256 位不透明随机 Token，PostgreSQL 仅保存 SHA-256 摘要；Cookie 使用 `__Host-`、Secure、HttpOnly、SameSite=Lax、Path=/。
+- 生命周期：预认证 5 分钟、idle 30 分钟、absolute 12 小时；支持登录轮换、登出和撤销，并在用户禁用、密码变化、授权版本变化或恢复操作后使 Session 失效。
+- 验收结果：Session PostgreSQL 13/13、Cookie 6/6、HTTP Login 8/8、RBAC 12/12、Platform Health 7/7 及标准质量门禁均通过，`npm audit` 为 0 vulnerabilities，Session/Login 安全终审无遗留问题。
 
 ## 目标
 
