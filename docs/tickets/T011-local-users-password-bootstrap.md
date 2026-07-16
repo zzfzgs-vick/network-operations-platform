@@ -2,7 +2,14 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- WSL Ubuntu 24.04 本地原生 Node.js、Go、真实 PostgreSQL 18.4、Argon2id、身份安全及运行时回归验收：通过。
+- GitHub Actions Ubuntu 24.04 与 Windows 验收：通过。
+- 对应 Git Commit：实现 `f0952da1896fc1b37e44f3f13dd5cc7835197f26`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29480246136`，Ubuntu job `87562105235`，Windows job `87562105227`；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29480246136>。
 
 ## 目标
 

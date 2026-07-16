@@ -1,6 +1,6 @@
 # MVP Implementation Roadmap
 
-状态：T001～T010 已完成，T011 已就绪
+状态：T001～T011 已完成，T012 已就绪
 
 ## 权威来源
 
@@ -15,7 +15,7 @@
 
 - 11 个 Epic/实施阶段（Phase 0～10）。
 - 60 张稳定编号 Ticket。
-- T001～T010 为 DONE；T011 是当前唯一 READY Ticket；其余 Ticket 保持 PLANNED。
+- T001～T011 为 DONE；T012 是当前唯一 READY Ticket；其余 Ticket 保持 PLANNED。
 - 数字顺序是合法拓扑顺序；部分同阶段 Ticket 可在共同前置完成后并行。
 - 非目标只作为范围守卫映射到验收 Ticket，不生成实现 Ticket。
 
@@ -341,4 +341,4 @@
 
 ## 首个执行项
 
-当前首个可执行项是 [T011：本地用户、密码与首个管理员初始化](T011-local-users-password-bootstrap.md)。T001～T010 已为 DONE，T011 的全部前置依赖均已完成，因此 T011 是当前唯一 READY Ticket。
+当前首个可执行项是 [T012：权限集合与默认拒绝 RBAC](T012-permission-rbac-enforcement.md)。T001～T011 已为 DONE，T012 的全部前置依赖均已完成，因此 T012 是当前唯一 READY Ticket。

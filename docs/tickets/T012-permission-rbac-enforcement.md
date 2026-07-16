@@ -1,7 +1,7 @@
 # T012：权限集合与默认拒绝 RBAC
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 实现基于稳定 Permission 的后端授权、默认角色模板和 authorizationVersion 基础。
