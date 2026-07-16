@@ -4,11 +4,14 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../../..");
 const composeFile = "deploy/compose/dev.compose.yml";
-const database = `nop_t009_${randomUUID().replaceAll("-", "")}`;
+const database = `nop_recovery_${randomUUID().replaceAll("-", "")}`;
 const databaseUser = process.env.DATABASE_USER ?? "nop";
 const [selection, ...extraSelections] = process.argv.slice(2);
 
-if (selection !== "runtime-shutdown" || extraSelections.length > 0) {
+if (
+  !["runtime-shutdown", "auth-break-glass"].includes(selection) ||
+  extraSelections.length > 0
+) {
   throw new Error(
     `Unknown recovery test selection: ${process.argv.slice(2).join(" ")}`,
   );
@@ -70,7 +73,12 @@ try {
   run(process.execPath, ["apps/platform/dist/migrate.js", "up"], environment);
   run(
     process.execPath,
-    ["--test", "tests/recovery/runtime/runtime-shutdown.test.mjs"],
+    [
+      "--test",
+      selection === "runtime-shutdown"
+        ? "tests/recovery/runtime/runtime-shutdown.test.mjs"
+        : "tests/recovery/auth/break-glass.test.mjs",
+    ],
     environment,
   );
 } finally {

@@ -12,6 +12,7 @@ import { BrowserCsrfMiddleware } from "./adapters/http/browser-csrf.middleware.j
 import { SessionController } from "./adapters/http/session.controller.js";
 import { PostgresAuthorizationService } from "./adapters/postgres/postgres-authorization-service.js";
 import { PostgresSessionService } from "./adapters/postgres/postgres-session-service.js";
+import { PostgresMfaRecoveryService } from "./adapters/postgres/postgres-mfa-recovery-service.js";
 import { PermissionGuard } from "./adapters/http/permission.guard.js";
 import {
   AuthorizationMetrics,
@@ -74,6 +75,33 @@ import { TotpMetrics } from "./application/totp.js";
         );
       },
     },
+    {
+      provide: PostgresMfaRecoveryService,
+      inject: [
+        DatabaseService,
+        PostgresSessionService,
+        PostgresAuthorizationService,
+      ],
+      useFactory: (
+        database: DatabaseService,
+        sessions: PostgresSessionService,
+        authorization: PostgresAuthorizationService,
+      ) => {
+        let audit: AuditStore | undefined;
+        return new PostgresMfaRecoveryService(
+          () => database.pool,
+          {
+            append: (client, input) => {
+              audit ??= new AuditStore(database.pool);
+              return audit.append(client, input);
+            },
+          },
+          sessions,
+          authorization,
+          readTotpConfig(),
+        );
+      },
+    },
     SessionAuthenticationMiddleware,
     BrowserCsrfMiddleware,
     PermissionGuard,
@@ -86,6 +114,7 @@ import { TotpMetrics } from "./application/totp.js";
     TotpMetrics,
     PostgresAuthorizationService,
     PostgresSessionService,
+    PostgresMfaRecoveryService,
     SessionAuthenticationMiddleware,
     BrowserCsrfMiddleware,
   ],

@@ -28,6 +28,7 @@ import {
   totpUri,
   validateTotp,
 } from "../../application/totp.js";
+import { replaceRecoveryCodeSet } from "../../application/mfa-recovery.js";
 
 interface AuditAppender {
   append(client: PoolClient, input: AuditEventInput): Promise<unknown>;
@@ -167,8 +168,37 @@ export class PostgresSessionService {
     readonly clientSummary?: string;
     readonly requestId?: string;
     readonly currentTokens?: readonly string[];
+    readonly emergencyReason?: string;
   }): Promise<IssuedWebSession> {
     const user = await this.identity.authenticate(input);
+    const emergency = await this.pool.query<{ enabled: boolean }>(
+      "select enabled from public.emergency_administrators where user_id = $1",
+      [user.userId],
+    );
+    const emergencyAccess = emergency.rows[0]?.enabled ?? false;
+    if (
+      emergencyAccess &&
+      !/^[a-z][a-z0-9._-]{2,63}$/u.test(input.emergencyReason ?? "")
+    ) {
+      await withTransaction(this.pool, (client) =>
+        this.audit.append(client, {
+          actor: { type: "USER", id: user.userId },
+          eventType: "AUTHENTICATION.EMERGENCY_ADMIN_DENIED",
+          source: "web-session",
+          outcome: "DENIED",
+          failureCategory: "EMERGENCY_REASON_REQUIRED",
+          resource: { type: "platform-user", id: user.userId },
+          ...(input.requestId === undefined
+            ? {}
+            : { requestId: input.requestId }),
+          details: {
+            reasonCategory: "reason-required",
+            metadata: { highPriority: true },
+          },
+        }),
+      );
+      throw new SessionRejectedError();
+    }
     const needsMfa = await this.hasSensitivePermission(user.userId);
     const hasAuthenticator = needsMfa
       ? await this.hasActiveTotpAuthenticator(user.userId)
@@ -291,6 +321,22 @@ export class PostgresSessionService {
           metadata: { sessionType: type.toLowerCase().replace("_", "-") },
         },
       });
+      if (emergencyAccess) {
+        await this.audit.append(client, {
+          actor: { type: "USER", id: user.userId },
+          eventType: "AUTHENTICATION.EMERGENCY_ADMIN_USED",
+          source: "web-session",
+          outcome: "SUCCESS",
+          resource: { type: "platform-user", id: user.userId },
+          ...(input.requestId === undefined
+            ? {}
+            : { requestId: input.requestId }),
+          details: {
+            reasonCategory: input.emergencyReason!,
+            metadata: { highPriority: true },
+          },
+        });
+      }
       this.metrics.record(
         "created",
         type === "AUTHENTICATED" ? "authenticated" : "pre-auth",
@@ -561,6 +607,7 @@ export class PostgresSessionService {
       }
 
       let authorizationVersion = Number(row.authorization_version);
+      let recoveryCodes: readonly string[] | undefined;
       if (row.purpose === "MFA_ENROLLMENT") {
         const authenticatorId = randomUUID();
         const encrypted = encryptTotpSecret(
@@ -598,6 +645,19 @@ export class PostgresSessionService {
           [row.user_id],
         );
         authorizationVersion = Number(updated.rows[0]!.authorization_version);
+        recoveryCodes = (await replaceRecoveryCodeSet(client, row.user_id))
+          .codes;
+        await this.audit.append(client, {
+          actor: { type: "USER", id: row.user_id },
+          eventType: "MFA.RECOVERY_CODES_GENERATED",
+          source: "totp",
+          outcome: "SUCCESS",
+          resource: { type: "platform-user", id: row.user_id },
+          ...(input.requestId === undefined
+            ? {}
+            : { requestId: input.requestId }),
+          details: { metadata: { count: recoveryCodes.length } },
+        });
       } else {
         await client.query(
           `update public.totp_authenticators
@@ -698,6 +758,7 @@ export class PostgresSessionService {
           token,
           csrfToken,
           expiresAt: expiresAt.toISOString(),
+          ...(recoveryCodes === undefined ? {} : { recoveryCodes }),
         },
         event: mfaMetricEvent(row.purpose),
         clockSkew: delta !== 0,

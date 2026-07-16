@@ -42,3 +42,6 @@ active sessions are revoked during upgrade because they cannot prove possession 
 `0009_totp_enrollment_login.up.sql` owns permission-driven MFA state, encrypted pending TOTP
 enrollment, one active TOTP authenticator per user, bounded MFA challenges, replay state, and an
 independent user/source throttle. Encryption keys remain outside PostgreSQL and Git.
+
+`0010_mfa_recovery_step_up_break_glass.up.sql` owns slow-hashed one-time Recovery Codes,
+action-bound one-use step-up grants, and explicit Emergency Administrator designation.

@@ -37,6 +37,17 @@ export {
 } from "./application/session.js";
 export { PostgresSessionService } from "./adapters/postgres/postgres-session-service.js";
 export {
+  MfaRecoveryRejectedError,
+  PostgresMfaRecoveryService,
+} from "./adapters/postgres/postgres-mfa-recovery-service.js";
+export {
+  RECOVERY_CODE_POLICY,
+  hashRecoveryCode,
+  newRecoveryCode,
+  validRecoveryCode,
+  verifyRecoveryCode,
+} from "./application/mfa-recovery.js";
+export {
   TOTP_POLICY,
   TotpMetrics,
   TotpRejectedError,

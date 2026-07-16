@@ -315,6 +315,10 @@ The MVP implements TOTP, permission-level enforcement, Recovery Codes, controlle
 
 It excludes SMS and email codes, Push MFA, WebAuthn/FIDO2, hardware security keys, biometrics, multiple simultaneous TOTP authenticators, external-provider MFA, and risk-adaptive authentication. Future OIDC integration should prefer provider-managed MFA and evaluate phishing-resistant WebAuthn/FIDO2; TOTP may remain for compatibility or recovery.
 
+### T016 implementation note
+
+The MVP stores ten Recovery Codes as independently salted Argon2id hashes and returns plaintext only with the enrollment or explicit regeneration result. The user confirms offline custody before using the set for sensitive step-up operations. Recovery invalidates the complete code set, active authenticator, and every Web Session before requiring enrollment again. Sensitive-operation grants are SHA-256-digested, single-use, bound to one user, Web Session, and operation, and expire no later than ten minutes after the database-recorded MFA proof. Grant consumption revalidates the live Session, user, authorization version, credential version, and required Permission in the same transaction as the sensitive change. The host-only break-glass command requires root on Unix or an administrator access token on Windows, disables its own Emergency Administrator designation after one use, forces password change and TOTP reenrollment, and writes both append-only PostgreSQL audit and a separate host security log.
+
 ## References
 
 - RFC 6238: `https://www.rfc-editor.org/rfc/rfc6238.html`

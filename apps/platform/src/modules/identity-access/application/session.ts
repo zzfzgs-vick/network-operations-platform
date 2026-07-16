@@ -19,6 +19,7 @@ export interface IssuedWebSession {
   readonly csrfToken: string;
   readonly expiresAt: string;
   readonly nextStep?: "PASSWORD_CHANGE" | "MFA_ENROLLMENT" | "MFA_VERIFY";
+  readonly recoveryCodes?: readonly string[];
 }
 
 export class CsrfMetrics {

@@ -12,6 +12,7 @@ if (
     "authorization",
     "csrf",
     "password-policy",
+    "mfa-recovery",
     "session-cookie",
     "totp",
   ].includes(selections[0])
@@ -36,6 +37,7 @@ const testFileBySelection = {
   "audit-redaction": "tests/integration/audit/audit-redaction.test.mjs",
   authorization: "tests/integration/authz/authorization.test.mjs",
   "password-policy": "tests/integration/auth/password-policy.test.mjs",
+  "mfa-recovery": "tests/integration/mfa/mfa-recovery-security.test.mjs",
   "session-cookie": "tests/integration/session/session-cookie.test.mjs",
   totp: "tests/integration/mfa/totp.test.mjs",
 };

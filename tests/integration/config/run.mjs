@@ -79,6 +79,7 @@ if (selections[0] === "platform-health") {
   selections[0] === "service-auth" ||
   selections[0] === "login" ||
   selections[0] === "mfa-login" ||
+  selections[0] === "step-up" ||
   selections[0] === "csrf" ||
   selections[0] === "session-lifecycle"
 ) {
@@ -87,9 +88,11 @@ if (selections[0] === "platform-health") {
       ? "t013"
       : selections[0] === "mfa-login"
         ? "t015"
-        : selections[0] === "csrf" || selections[0] === "session-lifecycle"
-          ? "t014"
-          : "t008";
+        : selections[0] === "step-up"
+          ? "t016"
+          : selections[0] === "csrf" || selections[0] === "session-lifecycle"
+            ? "t014"
+            : "t008";
   const database = `nop_${ticket}_${randomUUID().replaceAll("-", "")}`;
   const databaseUser = process.env.DATABASE_USER ?? "nop";
   const compose = (args) =>
@@ -128,11 +131,13 @@ if (selections[0] === "platform-health") {
         ? "tests/integration/session/login.test.mjs"
         : selections[0] === "mfa-login"
           ? "tests/integration/mfa/mfa-login.test.mjs"
-          : selections[0] === "csrf"
-            ? "tests/integration/session/csrf.test.mjs"
-            : selections[0] === "session-lifecycle"
-              ? "tests/integration/session/session-lifecycle.test.mjs"
-              : "tests/integration/config/service-auth.test.mjs",
+          : selections[0] === "step-up"
+            ? "tests/integration/mfa/step-up.test.mjs"
+            : selections[0] === "csrf"
+              ? "tests/integration/session/csrf.test.mjs"
+              : selections[0] === "session-lifecycle"
+                ? "tests/integration/session/session-lifecycle.test.mjs"
+                : "tests/integration/config/service-auth.test.mjs",
       environment,
     );
   } finally {
