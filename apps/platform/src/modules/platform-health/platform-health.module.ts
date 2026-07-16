@@ -27,6 +27,10 @@ import {
 } from "../../database/database.module.js";
 import { RuntimeLifecycle } from "../../lifecycle.js";
 import {
+  AuthorizationMetrics,
+  PublicEndpoint,
+} from "../identity-access/public.js";
+import {
   PlatformHealthStore,
   type ReliableWorkMetrics,
   type WorkerHeartbeatStatus,
@@ -202,9 +206,11 @@ class PlatformHealthController {
     private readonly health: RuntimeHealthService,
     private readonly requests: ApiRequestMetrics,
     private readonly serviceAuthentication: ServiceAuthenticationMetrics,
+    private readonly authorization: AuthorizationMetrics,
   ) {}
 
   @Get("health/live")
+  @PublicEndpoint()
   liveness() {
     return {
       service: "platform-api",
@@ -215,6 +221,7 @@ class PlatformHealthController {
   }
 
   @Get("health/ready")
+  @PublicEndpoint()
   async readiness(
     @Res({ passthrough: true }) response: { status(code: number): unknown },
   ) {
@@ -224,12 +231,14 @@ class PlatformHealthController {
   }
 
   @Get("metrics")
+  @PublicEndpoint()
   @Header("content-type", "text/plain; version=0.0.4; charset=utf-8")
   async metrics() {
     const health = await this.health.readiness();
     const reliable = await this.health.reliableWorkMetrics();
     const requests = this.requests.snapshot();
     const authenticationFailures = this.serviceAuthentication.snapshot();
+    const authorizationDecisions = this.authorization.snapshot();
     const lines = [
       metric(
         "nop_api_requests_success_total",
@@ -260,6 +269,12 @@ class PlatformHealthController {
       ...authenticationFailures.map(
         (failure) =>
           `nop_internal_service_auth_failures_total{service="${failure.service}",reason="${failure.reason}"} ${failure.count}`,
+      ),
+      "# HELP nop_authorization_decisions_total User authorization decisions by stable Permission and outcome.",
+      "# TYPE nop_authorization_decisions_total counter",
+      ...authorizationDecisions.map(
+        (decision) =>
+          `nop_authorization_decisions_total{permission="${decision.permission}",outcome="${decision.outcome}"} ${decision.count}`,
       ),
       "# HELP nop_runtime_dependency_available Dependency readiness (1 available, 0 unavailable or stale).",
       "# TYPE nop_runtime_dependency_available gauge",

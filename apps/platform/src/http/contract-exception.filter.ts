@@ -18,6 +18,7 @@ import {
 import { HttpAdapterHost } from "@nestjs/core";
 import type { IncomingMessage } from "node:http";
 
+import { AuthorizationDeniedError } from "../modules/identity-access/public.js";
 import { requestIdFrom } from "./request-id.js";
 
 const safeFieldPattern = /^[A-Za-z0-9_.[\]-]{1,128}$/;
@@ -42,7 +43,11 @@ export function mapHttpError(
   requestId: RequestId,
 ): { readonly status: number; readonly body: ErrorResponse } {
   const sourceStatus =
-    exception instanceof HttpException ? exception.getStatus() : 500;
+    exception instanceof HttpException
+      ? exception.getStatus()
+      : exception instanceof AuthorizationDeniedError
+        ? 403
+        : 500;
   const code = errorCodeForHttpStatus(sourceStatus);
   const definition = ERROR_DEFINITIONS[code];
   const fieldErrors =

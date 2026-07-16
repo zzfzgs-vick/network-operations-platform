@@ -28,3 +28,7 @@ event; released audit history is never rewritten by application capabilities.
 `0005_identity_access_local_users.up.sql` owns immutable Platform User identity, one Local
 Credential per user, bounded authentication throttling, and the singleton first-administrator
 bootstrap state. Passwords are represented only by Argon2id PHC strings.
+
+`0006_permission_rbac_foundation.up.sql` owns stable Permissions, five default Role templates,
+custom Roles, User Role Assignments, and the monotonic per-user authorization version. Role names
+are display labels and never authorization conditions.

@@ -284,12 +284,7 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
       ) {
         throw new AuthenticationRejectedError();
       }
-      await this.updatePassword(
-        transaction,
-        input.userId,
-        nextHash,
-        false,
-      );
+      await this.updatePassword(transaction, input.userId, nextHash, false);
       await this.appendUserAudit(transaction, input.audit, {
         eventType: "IDENTITY.INITIAL_PASSWORD_CHANGED",
         userId: input.userId,
@@ -319,12 +314,7 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
         true,
       );
       if (!current) throw new Error("Platform user not found");
-      await this.updatePassword(
-        transaction,
-        input.userId,
-        nextHash,
-        true,
-      );
+      await this.updatePassword(transaction, input.userId, nextHash, true);
       await this.appendUserAudit(transaction, input.audit, {
         eventType: "IDENTITY.PASSWORD_RESET",
         userId: input.userId,
@@ -462,9 +452,7 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
         userId,
         changedFields: ["status"],
       });
-      return mapUser(
-        (await this.readUser("userId", userId, transaction))!,
-      );
+      return mapUser((await this.readUser("userId", userId, transaction))!);
     });
   }
 
@@ -557,6 +545,13 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
 
   private async completeBootstrap(client: PoolClient, userId: string) {
     await client.query(
+      `insert into public.user_role_assignments (user_id, role_id)
+       select $1, role_id from public.roles
+        where role_key = 'system-administrator'
+       on conflict do nothing`,
+      [userId],
+    );
+    await client.query(
       `update public.platform_bootstrap_state
           set administrator_user_id = $1, initialized_at = clock_timestamp()
         where singleton_id = 1`,
@@ -602,7 +597,9 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
   ) {
     const result = await client.query(
       `update public.platform_users
-          set status = $2, updated_at = clock_timestamp()
+          set status = $2,
+              authorization_version = authorization_version + 1,
+              updated_at = clock_timestamp()
         where user_id = $1`,
       [userId, status],
     );

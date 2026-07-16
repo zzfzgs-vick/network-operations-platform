@@ -19,6 +19,8 @@ import { DatabaseModule } from "../database/database.module.js";
 import { ContractExceptionFilter } from "../http/contract-exception.filter.js";
 import { RequestIdMiddleware, requestIdFrom } from "../http/request-id.js";
 import { RuntimeLifecycle } from "../lifecycle.js";
+import { IdentityAccessModule } from "../modules/identity-access/identity-access.module.js";
+import { PublicEndpoint } from "../modules/identity-access/public.js";
 import { PlatformHealthApiModule } from "../modules/platform-health/platform-health.module.js";
 
 @Injectable()
@@ -53,6 +55,7 @@ class RuntimeDrainMiddleware implements NestMiddleware {
 @Controller()
 class RuntimeController {
   @Get()
+  @PublicEndpoint()
   getRuntime(@Req() request: IncomingMessage): RuntimeHealthResponse {
     const runtime = readRuntimeIdentityConfig();
     return {
@@ -66,7 +69,12 @@ class RuntimeController {
 }
 
 @Module({
-  imports: [DatabaseModule, InternalServiceAuthModule, PlatformHealthApiModule],
+  imports: [
+    DatabaseModule,
+    InternalServiceAuthModule,
+    IdentityAccessModule,
+    PlatformHealthApiModule,
+  ],
   controllers: [RuntimeController],
   providers: [
     RuntimeDrainMiddleware,

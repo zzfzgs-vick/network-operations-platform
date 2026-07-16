@@ -10,7 +10,9 @@ const [selection = "database", ...extraSelections] = process.argv.slice(2);
 
 if (
   extraSelections.length > 0 ||
-  !["audit", "database", "local-auth", "reliable-work"].includes(selection)
+  !["audit", "database", "local-auth", "rbac", "reliable-work"].includes(
+    selection,
+  )
 ) {
   throw new Error(
     `Unknown database test selection: ${process.argv.slice(2).join(" ")}`,
@@ -21,6 +23,7 @@ const ticketBySelection = {
   audit: "t010",
   database: "t004",
   "local-auth": "t011",
+  rbac: "t012",
 };
 const testDatabase = `nop_${ticketBySelection[selection] ?? "t004"}_${randomUUID().replaceAll("-", "")}`;
 
@@ -104,6 +107,7 @@ try {
     audit: "tests/integration/audit/audit.test.mjs",
     database: "tests/integration/database/database.test.mjs",
     "local-auth": "tests/integration/auth/local-auth.test.mjs",
+    rbac: "tests/integration/authz/rbac.test.mjs",
   };
   const testFile = testFileBySelection[selection];
   if (selection !== "database") {

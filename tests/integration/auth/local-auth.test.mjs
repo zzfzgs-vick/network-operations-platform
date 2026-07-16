@@ -58,6 +58,13 @@ test("local authentication foundation", async (t) => {
     await t.test(
       "empty and v4 databases upgrade once to the latest version",
       async () => {
+        const repositoryMigrations = (await readdir(migrationDirectory))
+          .filter((file) => /^\d{4}_[a-z0-9_]+\.up\.sql$/u.test(file))
+          .sort();
+        const latestVersion = Number(repositoryMigrations.at(-1)?.slice(0, 4));
+        const upgradeFromV4 = repositoryMigrations.filter(
+          (file) => Number(file.slice(0, 4)) > 4,
+        );
         await resetDatabase(pool);
         const files = (await readdir(migrationDirectory))
           .filter((file) => /^000[1-4]_.*\.up\.sql$/u.test(file))
@@ -68,21 +75,21 @@ test("local authentication foundation", async (t) => {
 
         assert.equal((await applyMigrations(pool, previous)).currentVersion, 4);
         assert.deepEqual(await applyMigrations(pool), {
-          appliedCount: 1,
-          currentVersion: 5,
+          appliedCount: upgradeFromV4.length,
+          currentVersion: latestVersion,
         });
         assert.equal((await applyMigrations(pool)).appliedCount, 0);
         assert.deepEqual(await getMigrationStatus(pool), {
-          currentVersion: 5,
-          latestVersion: 5,
+          currentVersion: latestVersion,
+          latestVersion,
           pendingVersions: [],
           compatible: true,
         });
 
         await resetDatabase(pool);
         assert.deepEqual(await applyMigrations(pool), {
-          appliedCount: 5,
-          currentVersion: 5,
+          appliedCount: repositoryMigrations.length,
+          currentVersion: latestVersion,
         });
       },
     );
