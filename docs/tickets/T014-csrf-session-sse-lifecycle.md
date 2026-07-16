@@ -1,7 +1,18 @@
 # T014：CSRF、防后台续期与 SSE 会话生命周期
 
 ## 状态
-READY
+
+DONE
+
+## 完成记录
+
+- 完成日期：2026-07-16。
+- 对应 Git Commit：实现 `c48fdeb2f99bf187b3bfada356022bb6fd7f9987`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29505530272`；Ubuntu 24.04 与 Windows 均通过；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29505530272>。
+- 数据库迁移：`0008_csrf_session_foundation.up.sql`，为 Web Session 增加仅保存 SHA-256 摘要的会话绑定 CSRF Token，并在升级时撤销无法证明新 Token 的旧活动会话。
+- CSRF 边界：状态变更执行精确 Origin/Referer、确认头与会话绑定 Token 校验；登录响应使用 `Cache-Control: no-store`，原始 Token 不进入数据库、日志、指标或 SSE envelope。
+- SSE 生命周期：连接和重连验证 PostgreSQL 权威 Session；心跳不更新 User Activity；撤销、授权版本变化、空闲或绝对到期后使用稳定安全原因关闭连接。
+- 验收结果：CSRF 4/4、SSE Session 生命周期 5/5、Session expiry E2E 5/5、既有 Login 8/8、Platform Health 7/7 及标准质量门禁均通过，`npm audit` 为 0 vulnerabilities，针对性安全终审无遗留问题。
 
 ## 目标
 完成同源 Cookie 会话的 CSRF、防被动续期和长连接撤销语义。

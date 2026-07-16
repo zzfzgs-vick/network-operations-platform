@@ -24,7 +24,7 @@ flowchart TD
     T011["T011 DONE · 本地用户、密码与初始化"]
     T012["T012 DONE · 权限集合与 RBAC"]
     T013["T013 DONE · PostgreSQL 不透明会话"]
-    T014["T014 READY · CSRF 与会话/SSE 生命周期"]
+    T014["T014 DONE · CSRF 与会话/SSE 生命周期"]
     T015["T015 READY · TOTP 注册与登录"]
     T016["T016 MFA 恢复与 break-glass"]
     T017["T017 认证安全验收"]
@@ -244,7 +244,7 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001～T013 已完成；T014 与 T015 的前置依赖均已满足，可以并行实施，但每次实现会话仍只执行一张 Ticket。
+- T001～T014 已完成；T015 的前置依赖已满足，按当前严格串行顺序继续实施。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
@@ -253,7 +253,7 @@ flowchart TD
 
 ## 当前可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T013：PostgreSQL 不透明会话与本地登录](T013-postgres-opaque-session-login.md) 已为 DONE。[T014：CSRF、防后台续期与 SSE 会话生命周期](T014-csrf-session-sse-lifecycle.md) 与 [T015：TOTP 注册、验证与敏感权限门控](T015-totp-enrollment-login.md) 的全部前置依赖均已完成，因此两者均为 READY。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T014：CSRF、防后台续期与 SSE 会话生命周期](T014-csrf-session-sse-lifecycle.md) 已为 DONE。按当前严格串行实施顺序，[T015：TOTP 注册、验证与敏感权限门控](T015-totp-enrollment-login.md) 为唯一 READY Ticket。
 
 ## DAG 检查规则
 

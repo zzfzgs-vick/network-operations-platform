@@ -13,7 +13,7 @@
 - `DONE`
 - `SUPERSEDED`
 
-仅当前置 Ticket 全部 `DONE` 后才可把 Ticket 改为 `READY`。[T001](T001-cross-platform-monorepo-quality-baseline.md)～[T013](T013-postgres-opaque-session-login.md) 已为 `DONE`；当前 `READY` Ticket 是 [T014](T014-csrf-session-sse-lifecycle.md) 与 [T015](T015-totp-enrollment-login.md)。Ticket 编号永久保留，不复用；完成后可保持原位，确需归档时移入 `completed/`，不改变编号或文件名。
+仅当前置 Ticket 全部 `DONE` 后才可把 Ticket 改为 `READY`。[T001](T001-cross-platform-monorepo-quality-baseline.md)～[T014](T014-csrf-session-sse-lifecycle.md) 已为 `DONE`；按当前严格串行实施顺序，当前 `READY` Ticket 是 [T015](T015-totp-enrollment-login.md)。Ticket 编号永久保留，不复用；完成后可保持原位，确需归档时移入 `completed/`，不改变编号或文件名。
 
 ## 工作规则
 
