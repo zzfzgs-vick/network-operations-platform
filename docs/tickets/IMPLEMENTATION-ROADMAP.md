@@ -1,6 +1,6 @@
 # MVP Implementation Roadmap
 
-状态：T001～T011 已完成，T012 已就绪
+状态：T001～T012 已完成，T013 已就绪
 
 ## 权威来源
 
@@ -15,7 +15,7 @@
 
 - 11 个 Epic/实施阶段（Phase 0～10）。
 - 60 张稳定编号 Ticket。
-- T001～T011 为 DONE；T012 是当前唯一 READY Ticket；其余 Ticket 保持 PLANNED。
+- T001～T012 为 DONE；T013 是当前唯一 READY Ticket；其余 Ticket 保持 PLANNED。
 - 数字顺序是合法拓扑顺序；部分同阶段 Ticket 可在共同前置完成后并行。
 - 非目标只作为范围守卫映射到验收 Ticket，不生成实现 Ticket。
 
@@ -40,16 +40,16 @@
 
 ## Phase 2：身份和平台安全
 
-| Ticket | 交付 | 前置 | 并行性 |
-| --- | --- | --- | --- |
-| [T010](T010-append-only-audit-foundation.md) | 追加式审计基础 | T006, T008 | 按依赖 |
-| [T011](T011-local-users-password-bootstrap.md) | 本地用户、密码与初始化 | T010 | 按依赖 |
-| [T012](T012-permission-rbac-enforcement.md) | 权限集合与 RBAC | T011 | 按依赖 |
-| [T013](T013-postgres-opaque-session-login.md) | PostgreSQL 不透明会话 | T012 | 按依赖 |
-| [T014](T014-csrf-session-sse-lifecycle.md) | CSRF 与会话/SSE 生命周期 | T013 | 可与同前置项并行 |
-| [T015](T015-totp-enrollment-login.md) | TOTP 注册与登录 | T013 | 可与同前置项并行 |
-| [T016](T016-mfa-recovery-step-up-break-glass.md) | MFA 恢复与 break-glass | T015 | 按依赖 |
-| [T017](T017-authentication-security-acceptance.md) | 认证安全验收 | T009, T014, T016 | 按依赖 |
+| Ticket | 交付 | 前置 | 状态 | 并行性 |
+| --- | --- | --- | --- | --- |
+| [T010](T010-append-only-audit-foundation.md) | 追加式审计基础 | T006, T008 | DONE | 按依赖 |
+| [T011](T011-local-users-password-bootstrap.md) | 本地用户、密码与初始化 | T010 | DONE | 按依赖 |
+| [T012](T012-permission-rbac-enforcement.md) | 权限集合与 RBAC | T011 | DONE | 按依赖 |
+| [T013](T013-postgres-opaque-session-login.md) | PostgreSQL 不透明会话 | T012 | READY | 按依赖 |
+| [T014](T014-csrf-session-sse-lifecycle.md) | CSRF 与会话/SSE 生命周期 | T013 | PLANNED | 可与同前置项并行 |
+| [T015](T015-totp-enrollment-login.md) | TOTP 注册与登录 | T013 | PLANNED | 可与同前置项并行 |
+| [T016](T016-mfa-recovery-step-up-break-glass.md) | MFA 恢复与 break-glass | T015 | PLANNED | 按依赖 |
+| [T017](T017-authentication-security-acceptance.md) | 认证安全验收 | T009, T014, T016 | PLANNED | 按依赖 |
 
 ## Phase 3：资产与拓扑权威数据
 
@@ -341,4 +341,4 @@
 
 ## 首个执行项
 
-当前首个可执行项是 [T012：权限集合与默认拒绝 RBAC](T012-permission-rbac-enforcement.md)。T001～T011 已为 DONE，T012 的全部前置依赖均已完成，因此 T012 是当前唯一 READY Ticket。
+当前首个可执行项是 [T013：PostgreSQL 不透明会话与本地登录](T013-postgres-opaque-session-login.md)。T001～T012 已为 DONE，T013 的全部前置依赖均已完成，因此 T013 是当前唯一 READY Ticket。

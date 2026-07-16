@@ -2,7 +2,16 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- 完成日期：2026-07-16。
+- 对应 Git Commit：实现 `4f318b6cd7f13d3d76d7b812b00ad505fb84cc30`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29491846717`；Ubuntu 24.04 与 Windows 均通过；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29491846717>。
+- 数据库迁移：`0006_permission_rbac_foundation.up.sql`，建立 Permission、Role、Role Permission、User Role Assignment 与 `authorizationVersion` 基础，并初始化五个默认角色模板。
+- 授权语义：受保护入口默认拒绝，禁用用户拒绝，角色或权限变化使 `authorizationVersion` 失效；Service Identity 与用户 RBAC 保持隔离。
+- 一致性与审计：敏感授权、拒绝和角色变更使用追加式事务审计；PostgreSQL RBAC 12/12、HTTP Authorization 6/6、T004～T010 回归及标准质量门禁均通过，`npm audit` 为 0 vulnerabilities，针对性 RBAC 安全审查无遗留问题。
 
 ## 目标
 

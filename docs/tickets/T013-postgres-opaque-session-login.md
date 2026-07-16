@@ -1,7 +1,7 @@
 # T013：PostgreSQL 不透明会话与本地登录
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 实现密码登录、预认证/正式会话、Host Cookie、Token 哈希和即时撤销。
@@ -71,4 +71,3 @@ PLANNED
 ## 后续 Ticket
 - [T014](T014-csrf-session-sse-lifecycle.md)
 - [T015](T015-totp-enrollment-login.md)
-
