@@ -29,6 +29,7 @@ import { RuntimeLifecycle } from "../../lifecycle.js";
 import {
   AuthorizationMetrics,
   PublicEndpoint,
+  SessionMetrics,
 } from "../identity-access/public.js";
 import {
   PlatformHealthStore,
@@ -207,6 +208,7 @@ class PlatformHealthController {
     private readonly requests: ApiRequestMetrics,
     private readonly serviceAuthentication: ServiceAuthenticationMetrics,
     private readonly authorization: AuthorizationMetrics,
+    private readonly sessions: SessionMetrics,
   ) {}
 
   @Get("health/live")
@@ -239,6 +241,7 @@ class PlatformHealthController {
     const requests = this.requests.snapshot();
     const authenticationFailures = this.serviceAuthentication.snapshot();
     const authorizationDecisions = this.authorization.snapshot();
+    const sessionEvents = this.sessions.snapshot();
     const lines = [
       metric(
         "nop_api_requests_success_total",
@@ -275,6 +278,12 @@ class PlatformHealthController {
       ...authorizationDecisions.map(
         (decision) =>
           `nop_authorization_decisions_total{permission="${decision.permission}",outcome="${decision.outcome}"} ${decision.count}`,
+      ),
+      "# HELP nop_web_session_events_total Opaque Web Session lifecycle events by bounded event and reason.",
+      "# TYPE nop_web_session_events_total counter",
+      ...sessionEvents.map(
+        (item) =>
+          `nop_web_session_events_total{event="${item.event}",reason="${item.reason}"} ${item.count}`,
       ),
       "# HELP nop_runtime_dependency_available Dependency readiness (1 available, 0 unavailable or stale).",
       "# TYPE nop_runtime_dependency_available gauge",

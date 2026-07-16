@@ -5,6 +5,8 @@ export interface PlatformUser {
   readonly username: string;
   readonly status: PlatformUserStatus;
   readonly mustChangePassword: boolean;
+  readonly credentialVersion: number;
+  readonly authorizationVersion: number;
   readonly createdAt: string;
   readonly updatedAt: string;
 }

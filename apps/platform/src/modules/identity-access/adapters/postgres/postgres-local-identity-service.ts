@@ -13,6 +13,7 @@ import {
   type PlatformUserStatus,
 } from "../../application/authentication-provider.js";
 import { hashPassword, verifyPassword } from "../../password.js";
+import { revokeUserSessions } from "./postgres-session-service.js";
 
 const LOCKOUT_DURATION_SECONDS = 30;
 
@@ -26,6 +27,8 @@ interface LocalUserRecord {
   readonly usernameNormalized: string;
   readonly status: PlatformUserStatus;
   readonly mustChangePassword: boolean;
+  readonly credentialVersion: number;
+  readonly authorizationVersion: number;
   readonly passwordHash: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -37,6 +40,8 @@ interface LocalUserRow {
   readonly username_normalized: string;
   readonly status: PlatformUserStatus;
   readonly must_change_password: boolean;
+  readonly credential_version: number;
+  readonly authorization_version: string;
   readonly password_hash: string;
   readonly created_at: Date;
   readonly updated_at: Date;
@@ -61,6 +66,8 @@ function mapUser(row: LocalUserRecord): PlatformUser {
     username: row.username,
     status: row.status,
     mustChangePassword: row.mustChangePassword,
+    credentialVersion: row.credentialVersion,
+    authorizationVersion: row.authorizationVersion,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -73,6 +80,8 @@ function mapRecord(row: LocalUserRow): LocalUserRecord {
     usernameNormalized: row.username_normalized,
     status: row.status,
     mustChangePassword: row.must_change_password,
+    credentialVersion: row.credential_version,
+    authorizationVersion: Number(row.authorization_version),
     passwordHash: row.password_hash,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -285,6 +294,14 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
         throw new AuthenticationRejectedError();
       }
       await this.updatePassword(transaction, input.userId, nextHash, false);
+      await revokeUserSessions(transaction, this.audit, {
+        userId: input.userId,
+        reason: "PASSWORD_CHANGED",
+        ...(input.audit.requestId === undefined
+          ? {}
+          : { requestId: input.audit.requestId }),
+        actor: input.audit.actor,
+      });
       await this.appendUserAudit(transaction, input.audit, {
         eventType: "IDENTITY.INITIAL_PASSWORD_CHANGED",
         userId: input.userId,
@@ -315,6 +332,14 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
       );
       if (!current) throw new Error("Platform user not found");
       await this.updatePassword(transaction, input.userId, nextHash, true);
+      await revokeUserSessions(transaction, this.audit, {
+        userId: input.userId,
+        reason: "PASSWORD_CHANGED",
+        ...(input.audit.requestId === undefined
+          ? {}
+          : { requestId: input.audit.requestId }),
+        actor: input.audit.actor,
+      });
       await this.appendUserAudit(transaction, input.audit, {
         eventType: "IDENTITY.PASSWORD_RESET",
         userId: input.userId,
@@ -444,6 +469,16 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
       if (!(await this.updateStatus(transaction, userId, status))) {
         throw new Error("Platform user not found");
       }
+      if (status === "DISABLED") {
+        await revokeUserSessions(transaction, this.audit, {
+          userId,
+          reason: "USER_DISABLED",
+          ...(audit.requestId === undefined
+            ? {}
+            : { requestId: audit.requestId }),
+          actor: audit.actor,
+        });
+      }
       await this.appendUserAudit(transaction, audit, {
         eventType:
           status === "ENABLED"
@@ -496,7 +531,8 @@ export class PostgresLocalIdentityService implements AuthenticationProvider {
     const column = field === "userId" ? "user_id" : "username_normalized";
     const result = await client.query<LocalUserRow>(
       `select u.user_id, u.username, u.username_normalized, u.status,
-              c.must_change_password, c.password_hash, u.created_at, u.updated_at
+              u.authorization_version, c.must_change_password,
+              c.credential_version, c.password_hash, u.created_at, u.updated_at
          from public.platform_users u
          join public.local_credentials c on c.user_id = u.user_id
         where u.${column} = $1

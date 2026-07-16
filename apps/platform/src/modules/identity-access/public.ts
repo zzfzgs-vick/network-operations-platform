@@ -27,6 +27,15 @@ export {
   type UserAuthorizer,
 } from "./application/authorization.js";
 export {
+  SessionMetrics,
+  SessionRejectedError,
+  type IssuedWebSession,
+  type SessionRevocationReason,
+  type ValidatedWebSession,
+  type WebSessionType,
+} from "./application/session.js";
+export { PostgresSessionService } from "./adapters/postgres/postgres-session-service.js";
+export {
   PublicEndpoint,
   RequirePermission,
   attachAuthenticatedUser,

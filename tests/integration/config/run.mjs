@@ -16,6 +16,10 @@ function run(command, args, options = {}) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
+    if (options.capture) {
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+    }
     throw new Error(`${command} exited with status ${result.status}`);
   }
   return result.stdout?.trim() ?? "";
@@ -64,8 +68,9 @@ if (selections[0] === "platform-health") {
       force: true,
     });
   }
-} else if (selections[0] === "service-auth") {
-  const database = `nop_t008_${randomUUID().replaceAll("-", "")}`;
+} else if (selections[0] === "service-auth" || selections[0] === "login") {
+  const ticket = selections[0] === "login" ? "t013" : "t008";
+  const database = `nop_${ticket}_${randomUUID().replaceAll("-", "")}`;
   const databaseUser = process.env.DATABASE_USER ?? "nop";
   const compose = (args) =>
     docker(["compose", "-f", "deploy/compose/dev.compose.yml", ...args]);
@@ -91,7 +96,12 @@ if (selections[0] === "platform-health") {
     run(process.execPath, ["apps/platform/dist/migrate.js", "up"], {
       env: environment,
     });
-    runTests("tests/integration/config/service-auth.test.mjs", environment);
+    runTests(
+      selections[0] === "login"
+        ? "tests/integration/session/login.test.mjs"
+        : "tests/integration/config/service-auth.test.mjs",
+      environment,
+    );
   } finally {
     compose([
       "exec",

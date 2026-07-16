@@ -15,6 +15,7 @@ import {
   type RoleSummary,
   type UserAuthorizer,
 } from "../../application/authorization.js";
+import { revokeUserSessions } from "./postgres-session-service.js";
 
 interface AuditAppender {
   append(client: PoolClient, input: AuditEventInput): Promise<unknown>;
@@ -237,7 +238,26 @@ export class PostgresAuthorizationService implements UserAuthorizer {
           return current;
         }
         await this.replacePermissions(client, input.roleId, permissions);
-        await this.incrementAssignedUserVersions(client, input.roleId);
+        const revokedSessions = await this.incrementAssignedUserVersions(
+          client,
+          input.roleId,
+        );
+        if (revokedSessions > 0) {
+          await this.audit.append(client, {
+            actor: { type: "USER", id: input.actor.userId },
+            eventType: "SESSION.ROLE_PERMISSION_CHANGE_REVOKED",
+            source: "web-session",
+            outcome: "SUCCESS",
+            resource: { type: "role", id: input.roleId },
+            ...(input.context?.requestId === undefined
+              ? {}
+              : { requestId: input.context.requestId }),
+            details: {
+              reasonCategory: "authorization-changed",
+              metadata: { revokedCount: revokedSessions },
+            },
+          });
+        }
         await this.appendChange(client, input.actor, input.context, {
           eventType: "AUTHORIZATION.ROLE_PERMISSIONS_CHANGED",
           resourceType: "role",
@@ -269,6 +289,14 @@ export class PostgresAuthorizationService implements UserAuthorizer {
         );
         if (inserted.rowCount === 1) {
           await this.incrementUserVersion(client, input.userId);
+          await revokeUserSessions(client, this.audit, {
+            userId: input.userId,
+            reason: "AUTHORIZATION_CHANGED",
+            ...(input.context?.requestId === undefined
+              ? {}
+              : { requestId: input.context.requestId }),
+            actor: { type: "USER", id: input.actor.userId },
+          });
           await this.appendChange(client, input.actor, input.context, {
             eventType: "AUTHORIZATION.ROLE_ASSIGNED",
             resourceType: "platform-user",
@@ -298,6 +326,14 @@ export class PostgresAuthorizationService implements UserAuthorizer {
         );
         if (removed.rowCount === 1) {
           await this.incrementUserVersion(client, input.userId);
+          await revokeUserSessions(client, this.audit, {
+            userId: input.userId,
+            reason: "AUTHORIZATION_CHANGED",
+            ...(input.context?.requestId === undefined
+              ? {}
+              : { requestId: input.context.requestId }),
+            actor: { type: "USER", id: input.actor.userId },
+          });
           await this.appendChange(client, input.actor, input.context, {
             eventType: "AUTHORIZATION.ROLE_REMOVED",
             resourceType: "platform-user",
@@ -528,6 +564,17 @@ export class PostgresAuthorizationService implements UserAuthorizer {
         )`,
       [roleId],
     );
+    const revoked = await client.query(
+      `update public.web_sessions s
+          set revoked_at = clock_timestamp(),
+              revocation_reason = 'AUTHORIZATION_CHANGED'
+        where s.revoked_at is null and exists (
+          select 1 from public.user_role_assignments ura
+           where ura.role_id = $1 and ura.user_id = s.user_id
+        )`,
+      [roleId],
+    );
+    return revoked.rowCount ?? 0;
   }
 
   private async incrementUserVersion(client: PoolClient, userId: string) {

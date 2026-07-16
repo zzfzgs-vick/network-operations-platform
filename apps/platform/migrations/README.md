@@ -32,3 +32,6 @@ bootstrap state. Passwords are represented only by Argon2id PHC strings.
 `0006_permission_rbac_foundation.up.sql` owns stable Permissions, five default Role templates,
 custom Roles, User Role Assignments, and the monotonic per-user authorization version. Role names
 are display labels and never authorization conditions.
+
+`0007_postgres_opaque_sessions.up.sql` owns SHA-256-digested opaque web sessions and the
+single recovery generation marker. Raw session tokens are never persisted.

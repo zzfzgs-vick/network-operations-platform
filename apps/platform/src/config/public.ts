@@ -336,6 +336,39 @@ export interface RuntimeShutdownConfig {
   readonly workerShutdownTimeoutMs: number;
 }
 
+export interface WebSessionConfig {
+  readonly preAuthenticationTimeoutMs: number;
+  readonly idleTimeoutMs: number;
+  readonly absoluteTimeoutMs: number;
+}
+
+export function readWebSessionConfig(
+  environment: Environment = process.env,
+): WebSessionConfig {
+  const preAuthenticationTimeoutMs = integer(
+    environment,
+    "SESSION_PRE_AUTH_TIMEOUT_MS",
+    5 * 60 * 1000,
+    60_000,
+    5 * 60 * 1000,
+  );
+  const idleTimeoutMs = integer(
+    environment,
+    "SESSION_IDLE_TIMEOUT_MS",
+    30 * 60 * 1000,
+    60_000,
+    60 * 60 * 1000,
+  );
+  const absoluteTimeoutMs = integer(
+    environment,
+    "SESSION_ABSOLUTE_TIMEOUT_MS",
+    12 * 60 * 60 * 1000,
+    idleTimeoutMs,
+    24 * 60 * 60 * 1000,
+  );
+  return { preAuthenticationTimeoutMs, idleTimeoutMs, absoluteTimeoutMs };
+}
+
 export function readRuntimeShutdownConfig(
   environment: Environment = process.env,
 ): RuntimeShutdownConfig {
@@ -379,6 +412,7 @@ export function safeConfigurationSummary(
   const health = readRuntimeHealthConfig(environment);
   const runtime = readRuntimeIdentityConfig(environment);
   const shutdown = readRuntimeShutdownConfig(environment);
+  const session = readWebSessionConfig(environment);
   return {
     environment: runtimeEnvironment(environment),
     version: runtime.version,
@@ -403,6 +437,7 @@ export function safeConfigurationSummary(
       workerInstanceId: health.workerInstanceId,
     },
     shutdown,
+    session,
   };
 }
 
@@ -411,4 +446,5 @@ export const loadedConfigurationCategories = [
   "internal_service_authentication",
   "runtime",
   "runtime_health",
+  "web_session",
 ] as const;

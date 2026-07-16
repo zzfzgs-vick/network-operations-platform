@@ -7,9 +7,12 @@ const selections = process.argv.slice(2);
 
 if (
   selections.length !== 1 ||
-  !["audit-redaction", "authorization", "password-policy"].includes(
-    selections[0],
-  )
+  ![
+    "audit-redaction",
+    "authorization",
+    "password-policy",
+    "session-cookie",
+  ].includes(selections[0])
 ) {
   throw new Error(`Unknown security test selection: ${selections.join(" ")}`);
 }
@@ -18,6 +21,7 @@ const testFileBySelection = {
   "audit-redaction": "tests/integration/audit/audit-redaction.test.mjs",
   authorization: "tests/integration/authz/authorization.test.mjs",
   "password-policy": "tests/integration/auth/password-policy.test.mjs",
+  "session-cookie": "tests/integration/session/session-cookie.test.mjs",
 };
 const testFile = testFileBySelection[selections[0]];
 

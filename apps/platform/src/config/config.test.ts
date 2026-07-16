@@ -11,6 +11,7 @@ import {
   readApiListenConfig,
   readRuntimeHealthConfig,
   readRuntimeShutdownConfig,
+  readWebSessionConfig,
   readSecret,
   safeConfigurationSummary,
   SecretValue,
@@ -22,6 +23,26 @@ import {
 
 const collectorToken = "t008-test-only-collector-token-not-production";
 const vmAlertToken = "t008-test-only-vmalert-token-not-production";
+
+test("web session policy fixes bounded pre-auth, idle, and absolute timeouts", () => {
+  assert.deepEqual(readWebSessionConfig({}), {
+    preAuthenticationTimeoutMs: 300_000,
+    idleTimeoutMs: 1_800_000,
+    absoluteTimeoutMs: 43_200_000,
+  });
+  assert.throws(
+    () => readWebSessionConfig({ SESSION_PRE_AUTH_TIMEOUT_MS: "300001" }),
+    /SESSION_PRE_AUTH_TIMEOUT_MS/u,
+  );
+  assert.throws(
+    () =>
+      readWebSessionConfig({
+        SESSION_IDLE_TIMEOUT_MS: "3600000",
+        SESSION_ABSOLUTE_TIMEOUT_MS: "3599999",
+      }),
+    /SESSION_ABSOLUTE_TIMEOUT_MS/u,
+  );
+});
 
 test("config rejects missing, empty, and conflicting Secret sources", () => {
   assert.throws(() => readSecret({}, "TEST_SECRET"), /TEST_SECRET is required/);

@@ -20,6 +20,7 @@ import { ContractExceptionFilter } from "../http/contract-exception.filter.js";
 import { RequestIdMiddleware, requestIdFrom } from "../http/request-id.js";
 import { RuntimeLifecycle } from "../lifecycle.js";
 import { IdentityAccessModule } from "../modules/identity-access/identity-access.module.js";
+import { SessionAuthenticationMiddleware } from "../modules/identity-access/adapters/http/session-authentication.middleware.js";
 import { PublicEndpoint } from "../modules/identity-access/public.js";
 import { PlatformHealthApiModule } from "../modules/platform-health/platform-health.module.js";
 
@@ -83,6 +84,12 @@ class RuntimeController {
 })
 export class ApiAppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware, RuntimeDrainMiddleware).forRoutes("*");
+    consumer
+      .apply(
+        RequestIdMiddleware,
+        SessionAuthenticationMiddleware,
+        RuntimeDrainMiddleware,
+      )
+      .forRoutes("*");
   }
 }

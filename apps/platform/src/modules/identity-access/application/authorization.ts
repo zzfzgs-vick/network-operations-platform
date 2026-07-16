@@ -41,6 +41,7 @@ export interface AuthenticatedUserPrincipal {
   readonly kind: "platform-user";
   readonly userId: string;
   readonly authorizationVersion: number;
+  readonly sessionId?: string;
 }
 
 export interface AuthorizationContext {
