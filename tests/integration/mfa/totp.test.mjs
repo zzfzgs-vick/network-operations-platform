@@ -41,6 +41,7 @@ test("TOTP secrets use authenticated encryption and bounded configuration", () =
     TOTP_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     TOTP_ENCRYPTION_KEY_VERSION: "test-v1",
   });
+  assert.equal(config.enrollmentTimeoutMs, 300_000);
   const secret = newTotpSecret();
   const encrypted = encryptTotpSecret(secret, "user:factor", config);
   assert.equal(encrypted.ciphertext.includes(Buffer.from(secret)), false);

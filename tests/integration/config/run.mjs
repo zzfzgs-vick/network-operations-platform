@@ -64,8 +64,7 @@ if (selections[0] === "platform-health") {
       {
         env: {
           ...process.env,
-          TOTP_ENCRYPTION_KEY:
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          TOTP_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
           TOTP_ENCRYPTION_KEY_VERSION: "test-v1",
         },
       },
@@ -117,6 +116,9 @@ if (selections[0] === "platform-health") {
       SESSION_REVALIDATION_INTERVAL_MS: "100",
       TOTP_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       TOTP_ENCRYPTION_KEY_VERSION: "test-v1",
+      ...(selections[0] === "mfa-login"
+        ? { TOTP_ENROLLMENT_TIMEOUT_MS: "60000" }
+        : {}),
     };
     run(process.execPath, ["apps/platform/dist/migrate.js", "up"], {
       env: environment,

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import { Controller, Get, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import test from "node:test";
@@ -9,6 +8,7 @@ import { readDatabaseConfig } from "../../../apps/platform/dist/database/config.
 import { createDatabasePool } from "../../../apps/platform/dist/database/database.js";
 import { AuditStore } from "../../../apps/platform/dist/modules/audit/public.js";
 import { PostgresLocalIdentityService } from "../../../apps/platform/dist/modules/identity-access/adapters/postgres/postgres-local-identity-service.js";
+import { PostgresAuthorizationService } from "../../../apps/platform/dist/modules/identity-access/adapters/postgres/postgres-authorization-service.js";
 import {
   PostgresSessionService,
   RequirePermission,
@@ -16,11 +16,31 @@ import {
 } from "../../../apps/platform/dist/modules/identity-access/public.js";
 
 class SensitiveController {
+  readOrdinary() {
+    return { allowed: true };
+  }
+
   read() {
     return { allowed: true };
   }
 }
 Controller("mfa-test")(SensitiveController);
+Get("ordinary")(
+  SensitiveController.prototype,
+  "readOrdinary",
+  Object.getOwnPropertyDescriptor(
+    SensitiveController.prototype,
+    "readOrdinary",
+  ),
+);
+RequirePermission("assets.read")(
+  SensitiveController.prototype,
+  "readOrdinary",
+  Object.getOwnPropertyDescriptor(
+    SensitiveController.prototype,
+    "readOrdinary",
+  ),
+);
 Get("sensitive")(
   SensitiveController.prototype,
   "read",
@@ -67,7 +87,7 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
   const pool = createDatabasePool(readDatabaseConfig(process.env));
   const audit = new AuditStore(pool);
   const identity = new PostgresLocalIdentityService(pool, audit);
-  await identity.bootstrapAdministrator({
+  const admin = await identity.bootstrapAdministrator({
     username: "mfa-admin",
     password: adminPassword,
   });
@@ -82,38 +102,25 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
     newPassword: userPassword,
     audit: { actor: { type: "SYSTEM", id: "t015-test" } },
   });
-  let sensitive = await identity.createUser({
-    username: "mfa-sensitive",
-    password: initialPassword,
-    audit: { actor: { type: "SYSTEM", id: "t015-test" } },
+  const authorization = new PostgresAuthorizationService(pool, audit);
+  const adminState = await authorization.getAuthorizationState(admin.userId);
+  const adminActor = {
+    kind: "platform-user",
+    userId: admin.userId,
+    authorizationVersion: adminState.authorizationVersion,
+  };
+  const role = await authorization.createRole({
+    actor: adminActor,
+    name: "Ordinary Asset Reader",
+    permissions: ["assets.read"],
+    context: { requestId: "t015-role-create" },
   });
-  sensitive = await identity.changeInitialPassword({
-    userId: sensitive.userId,
-    currentPassword: initialPassword,
-    newPassword: userPassword,
-    audit: { actor: { type: "SYSTEM", id: "t015-test" } },
+  await authorization.assignRole({
+    actor: adminActor,
+    userId: normal.userId,
+    roleId: role.roleId,
+    context: { requestId: "t015-role-assign" },
   });
-  const roleId = randomUUID();
-  await pool.query(
-    `insert into public.roles (role_id, name, name_normalized, system_template)
-     values ($1, 'Custom Security Operator', 'custom security operator', false)`,
-    [roleId],
-  );
-  await pool.query(
-    "insert into public.role_permissions (role_id, permission_code) values ($1, 'users.manage')",
-    [roleId],
-  );
-  await pool.query(
-    `insert into public.user_role_assignments (user_id, role_id) values ($1, $2)`,
-    [sensitive.userId, roleId],
-  );
-  await pool.query(
-    `update public.platform_users
-        set authorization_version = authorization_version + 1,
-            mfa_state = 'MFA_ENROLLMENT_REQUIRED'
-      where user_id = $1`,
-    [sensitive.userId],
-  );
 
   const app = await NestFactory.create(MfaTestModule, { logger: false });
   await app.listen(0, "127.0.0.1");
@@ -142,20 +149,70 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
     });
 
   try {
+    let ordinaryCookie;
+    let ordinaryAuthorizationState;
     await t.test("ordinary permissions do not force MFA", async () => {
+      ordinaryAuthorizationState = await authorization.getAuthorizationState(
+        normal.userId,
+      );
       const response = await login(normal.username, userPassword);
       assert.equal(response.status, 200);
       assert.equal((await response.json()).status, "AUTHENTICATED");
-      issuedCookie(response, "__Host-nop_session");
+      ordinaryCookie = issuedCookie(response, "__Host-nop_session");
+      assert.equal(
+        (
+          await globalThis.fetch(`${baseUrl}/mfa-test/ordinary`, {
+            headers: { cookie: ordinaryCookie },
+          })
+        ).status,
+        200,
+      );
     });
 
     let preAuthCookie;
     let preAuthCsrf;
     let secret;
+    const issuedSensitiveValues = new Set();
     await t.test(
-      "a custom sensitive Role requires confirmed enrollment",
+      "the authorization service promotes a Role into MFA enforcement",
       async () => {
-        const response = await login(sensitive.username, userPassword);
+        await authorization.renameRole({
+          actor: adminActor,
+          roleId: role.roleId,
+          name: "Harmless Looking Role",
+          context: { requestId: "t015-role-rename" },
+        });
+        await authorization.setRolePermissions({
+          actor: adminActor,
+          roleId: role.roleId,
+          permissions: ["assets.read", "users.manage"],
+          context: { requestId: "t015-sensitive-promotion" },
+        });
+        const promoted = await authorization.getAuthorizationState(
+          normal.userId,
+        );
+        assert.equal(
+          promoted.authorizationVersion,
+          ordinaryAuthorizationState.authorizationVersion + 1,
+        );
+        assert.equal(promoted.permissions.includes("users.manage"), true);
+        const userState = await pool.query(
+          "select mfa_state from public.platform_users where user_id = $1",
+          [normal.userId],
+        );
+        assert.equal(userState.rows[0].mfa_state, "MFA_ENROLLMENT_REQUIRED");
+        for (const endpoint of ["ordinary", "sensitive"]) {
+          assert.equal(
+            (
+              await globalThis.fetch(`${baseUrl}/mfa-test/${endpoint}`, {
+                headers: { cookie: ordinaryCookie },
+              })
+            ).status,
+            401,
+          );
+        }
+
+        const response = await login(normal.username, userPassword);
         const body = await response.json();
         preAuthCookie = issuedCookie(response, "__Host-nop_preauth");
         preAuthCsrf = response.headers.get("x-csrf-token");
@@ -178,18 +235,81 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
           "no-store",
         );
         secret = enrollment.secret;
+        issuedSensitiveValues.add(secret);
         assert.match(secret, /^[A-Z2-7]{32}$/u);
         assert.match(enrollment.uri, /^otpauth:\/\/totp\//u);
+        const expiry = await pool.query(
+          `select e.created_at, e.expires_at,
+                  c.expires_at as challenge_expires_at
+             from public.totp_enrollments e
+             join public.mfa_challenges c on c.user_id = e.user_id
+            where e.user_id = $1 and c.purpose = 'MFA_ENROLLMENT'
+            order by c.created_at desc limit 1`,
+          [normal.userId],
+        );
+        assert.equal(
+          enrollment.expiresAt,
+          expiry.rows[0].expires_at.toISOString(),
+        );
+        assert.equal(
+          expiry.rows[0].expires_at.getTime() -
+            expiry.rows[0].created_at.getTime(),
+          60_000,
+        );
+        assert.ok(
+          expiry.rows[0].expires_at < expiry.rows[0].challenge_expires_at,
+        );
+        await pool.query(
+          `update public.totp_enrollments
+              set created_at = clock_timestamp() - interval '2 minutes',
+                  expires_at = clock_timestamp() - interval '1 minute'
+            where user_id = $1`,
+          [normal.userId],
+        );
+        const databaseClock = await pool.query(
+          "select clock_timestamp() as now",
+        );
+        const expiredCode = createTotp(
+          secret,
+          databaseClock.rows[0].now.getTime(),
+        );
+        issuedSensitiveValues.add(expiredCode);
+        assert.equal(
+          (await verify(preAuthCookie, preAuthCsrf, expiredCode)).status,
+          401,
+        );
+
+        const replacementResponse = await enroll(preAuthCookie, preAuthCsrf);
+        const replacement = await replacementResponse.json();
+        assert.equal(replacementResponse.status, 200);
+        secret = replacement.secret;
+        issuedSensitiveValues.add(secret);
         const active = await pool.query(
           "select count(*)::integer as count from public.totp_authenticators where user_id = $1 and status = 'ACTIVE'",
-          [sensitive.userId],
+          [normal.userId],
         );
         assert.equal(active.rows[0].count, 0);
+
+        const auditEvents = await pool.query(
+          `select event_type from public.audit_events
+            where event_type in (
+              'AUTHORIZATION.ROLE_RENAMED',
+              'AUTHORIZATION.ROLE_PERMISSIONS_CHANGED',
+              'SESSION.ROLE_PERMISSION_CHANGE_REVOKED'
+            )`,
+        );
+        assert.deepEqual(
+          new Set(auditEvents.rows.map((event) => event.event_type)),
+          new Set([
+            "AUTHORIZATION.ROLE_RENAMED",
+            "AUTHORIZATION.ROLE_PERMISSIONS_CHANGED",
+            "SESSION.ROLE_PERMISSION_CHANGE_REVOKED",
+          ]),
+        );
       },
     );
 
     let authenticatedCookie;
-    let newlySensitivePreAuth;
     let replayPreAuthSessionId;
     let sourceThrottleCountBefore;
     await t.test(
@@ -199,6 +319,7 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
           "select floor(extract(epoch from clock_timestamp()) / 30)::bigint as step",
         );
         const code = createTotp(secret, Number(clock.rows[0].step) * 30_000);
+        issuedSensitiveValues.add(code);
         const response = await verify(preAuthCookie, preAuthCsrf, code);
         assert.equal(response.status, 200);
         assert.equal((await response.json()).status, "AUTHENTICATED");
@@ -220,7 +341,7 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
              join public.web_sessions s on s.user_id = u.user_id
             where u.user_id = $1 and a.status = 'ACTIVE'
               and s.revoked_at is null`,
-          [sensitive.userId],
+          [normal.userId],
         );
         assert.equal(stored.rows[0].mfa_state, "ENROLLED");
         assert.equal(stored.rows[0].authentication_strength, "PASSWORD_MFA");
@@ -233,7 +354,7 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
     );
 
     await t.test("the same accepted time step cannot be replayed", async () => {
-      const loginResponse = await login(sensitive.username, userPassword);
+      const loginResponse = await login(normal.username, userPassword);
       const cookie = issuedCookie(loginResponse, "__Host-nop_preauth");
       const csrf = loginResponse.headers.get("x-csrf-token");
       assert.equal((await loginResponse.json()).nextStep, "MFA_VERIFY");
@@ -241,17 +362,18 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
         `select session_id from public.web_sessions
           where user_id = $1 and session_type = 'PRE_AUTH' and revoked_at is null
           order by created_at desc, session_id desc limit 1`,
-        [sensitive.userId],
+        [normal.userId],
       );
       replayPreAuthSessionId = replaySession.rows[0].session_id;
       const accepted = await pool.query(
         "select last_accepted_step from public.totp_authenticators where user_id = $1 and status = 'ACTIVE'",
-        [sensitive.userId],
+        [normal.userId],
       );
       const replayCode = createTotp(
         secret,
         Number(accepted.rows[0].last_accepted_step) * 30_000,
       );
+      issuedSensitiveValues.add(replayCode);
       const response = await verify(cookie, csrf, replayCode);
       assert.equal(response.status, 401);
       assert.doesNotMatch(await response.text(), new RegExp(replayCode, "u"));
@@ -266,7 +388,7 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
     await t.test(
       "one adjacent step is accepted after replay rejection",
       async () => {
-        const loginResponse = await login(sensitive.username, userPassword);
+        const loginResponse = await login(normal.username, userPassword);
         const cookie = issuedCookie(loginResponse, "__Host-nop_preauth");
         const csrf = loginResponse.headers.get("x-csrf-token");
         const clock = await pool.query(
@@ -276,6 +398,7 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
           secret,
           (Number(clock.rows[0].step) + 1) * 30_000,
         );
+        issuedSensitiveValues.add(nextCode);
         const response = await verify(cookie, csrf, nextCode);
         assert.equal(response.status, 200);
         issuedCookie(response, "__Host-nop_session");
@@ -293,58 +416,31 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
     );
 
     await t.test(
-      "a sensitive grant invalidates an old ordinary Session",
-      async () => {
-        const ordinary = await login(normal.username, userPassword);
-        const cookie = issuedCookie(ordinary, "__Host-nop_session");
-        await pool.query(
-          "insert into public.user_role_assignments (user_id, role_id) values ($1, $2)",
-          [normal.userId, roleId],
-        );
-        await pool.query(
-          `update public.platform_users
-              set authorization_version = authorization_version + 1,
-                  mfa_state = 'MFA_ENROLLMENT_REQUIRED'
-            where user_id = $1`,
-          [normal.userId],
-        );
-        const rejected = await globalThis.fetch(
-          `${baseUrl}/mfa-test/sensitive`,
-          { headers: { cookie } },
-        );
-        assert.equal(rejected.status, 401);
-        const fresh = await login(normal.username, userPassword);
-        assert.equal((await fresh.json()).nextStep, "MFA_ENROLLMENT");
-        newlySensitivePreAuth = {
-          cookie: issuedCookie(fresh, "__Host-nop_preauth"),
-          csrf: fresh.headers.get("x-csrf-token"),
-        };
-      },
-    );
-
-    await t.test(
       "TOTP failures use an independent bounded throttle",
       async () => {
-        const enrollmentResponse = await enroll(
-          newlySensitivePreAuth.cookie,
-          newlySensitivePreAuth.csrf,
-        );
-        const enrollment = await enrollmentResponse.json();
+        const loginResponse = await login(normal.username, userPassword);
+        const throttlePreAuth = {
+          cookie: issuedCookie(loginResponse, "__Host-nop_preauth"),
+          csrf: loginResponse.headers.get("x-csrf-token"),
+        };
+        assert.equal((await loginResponse.json()).nextStep, "MFA_VERIFY");
         const clock = await pool.query(
           "select floor(extract(epoch from clock_timestamp()) / 30)::bigint as step",
         );
         const validCode = createTotp(
-          enrollment.secret,
+          secret,
           Number(clock.rows[0].step) * 30_000,
         );
         const invalidCode = String(
           (Number(validCode) + 1) % 1_000_000,
         ).padStart(6, "0");
+        issuedSensitiveValues.add(validCode);
+        issuedSensitiveValues.add(invalidCode);
         const sessionService = app.get(PostgresSessionService);
         for (let attempt = 0; attempt < 5; attempt += 1) {
           await assert.rejects(
             sessionService.completeTotp({
-              preAuthenticationToken: cookieToken(newlySensitivePreAuth.cookie),
+              preAuthenticationToken: cookieToken(throttlePreAuth.cookie),
               code: invalidCode,
               source: `198.51.100.${attempt + 1}`,
               requestId: `t015-throttle-${attempt + 1}`,
@@ -355,8 +451,8 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
         assert.equal(
           (
             await verify(
-              newlySensitivePreAuth.cookie,
-              newlySensitivePreAuth.csrf,
+              throttlePreAuth.cookie,
+              throttlePreAuth.csrf,
               validCode,
             )
           ).status,
@@ -389,7 +485,9 @@ test("permission-driven TOTP enrollment and two-stage login", async (t) => {
         "select details from public.audit_events where event_type like 'MFA.%'",
       );
       const rendered = JSON.stringify(events.rows);
-      assert.equal(rendered.includes(secret), false);
+      for (const sensitiveValue of issuedSensitiveValues) {
+        assert.equal(rendered.includes(sensitiveValue), false);
+      }
       assert.doesNotMatch(rendered, /otpauth|"code"/iu);
     });
   } finally {

@@ -347,25 +347,33 @@ export class PostgresSessionService {
       const challenge = await client.query<{
         user_id: string;
         username: string;
+        created_at: Date;
         expires_at: Date;
       }>(
-        `select c.user_id, u.username, c.expires_at
+        `select c.user_id, u.username, timing.database_now as created_at,
+                least(
+                  c.expires_at,
+                  timing.database_now + ($2::bigint * interval '1 millisecond')
+                ) as expires_at
            from public.mfa_challenges c
            join public.web_sessions s on s.session_id = c.session_id
            join public.platform_users u on u.user_id = c.user_id
            join public.local_credentials lc on lc.user_id = c.user_id
            join public.platform_session_generation g on g.singleton_id = 1
+          cross join lateral (
+            select clock_timestamp() as database_now
+          ) timing
           where c.session_id = $1 and c.purpose = 'MFA_ENROLLMENT'
             and c.completed_at is null and s.revoked_at is null
             and u.status = 'ENABLED'
             and s.authorization_version = u.authorization_version
             and s.credential_version = lc.credential_version
             and s.generation_id = g.generation_id
-            and s.absolute_expires_at > clock_timestamp()
-            and (s.idle_expires_at is null or s.idle_expires_at > clock_timestamp())
-            and c.expires_at > clock_timestamp()
+            and s.absolute_expires_at > timing.database_now
+            and (s.idle_expires_at is null or s.idle_expires_at > timing.database_now)
+            and c.expires_at > timing.database_now
           for update of c, s, u, lc, g`,
-        [session.sessionId],
+        [session.sessionId, this.totpConfig.enrollmentTimeoutMs],
       );
       const row = challenge.rows[0];
       if (!row) return undefined;
@@ -381,8 +389,8 @@ export class PostgresSessionService {
       await client.query(
         `insert into public.totp_enrollments (
            enrollment_id, user_id, secret_ciphertext, secret_nonce,
-           secret_tag, key_version, expires_at
-         ) values ($1, $2, $3, $4, $5, $6, $7)`,
+           secret_tag, key_version, created_at, expires_at
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           enrollmentId,
           row.user_id,
@@ -390,6 +398,7 @@ export class PostgresSessionService {
           encrypted.nonce,
           encrypted.tag,
           encrypted.keyVersion,
+          row.created_at,
           row.expires_at,
         ],
       );
