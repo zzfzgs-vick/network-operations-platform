@@ -46,6 +46,20 @@ export interface RuntimeHealthResponse {
   readonly requestId?: RequestId;
 }
 
+export type SessionLifecycleEventType = "CONNECTED" | "CLOSED";
+
+export type SessionClosureReason = "UNAUTHENTICATED" | "IDLE_EXPIRED" | "ABSOLUTE_EXPIRED" | "REVOKED" | "AUTHORIZATION_CHANGED" | "CREDENTIAL_CHANGED" | "UNAVAILABLE";
+
+export interface SessionLifecycleEvent {
+  readonly contractVersion: ContractVersion;
+  readonly event: SessionLifecycleEventType;
+  readonly reason?: SessionClosureReason;
+  readonly occurredAt: UtcTimestamp;
+  readonly lastSuccessfulAt?: UtcTimestamp;
+  readonly stale: boolean;
+  readonly reauthenticationRequired: boolean;
+}
+
 export type FailureClassification = "TRANSIENT" | "PERMANENT" | "VALIDATION" | "VERSION_MISMATCH" | "UNAVAILABLE" | "UNKNOWN";
 
 export interface InternalFailure {

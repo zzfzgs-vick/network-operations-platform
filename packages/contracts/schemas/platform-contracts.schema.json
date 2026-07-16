@@ -146,6 +146,42 @@
       },
       "additionalProperties": true
     },
+    "SessionLifecycleEventType": {
+      "type": "string",
+      "enum": ["CONNECTED", "CLOSED"]
+    },
+    "SessionClosureReason": {
+      "type": "string",
+      "enum": [
+        "UNAUTHENTICATED",
+        "IDLE_EXPIRED",
+        "ABSOLUTE_EXPIRED",
+        "REVOKED",
+        "AUTHORIZATION_CHANGED",
+        "CREDENTIAL_CHANGED",
+        "UNAVAILABLE"
+      ]
+    },
+    "SessionLifecycleEvent": {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "event",
+        "occurredAt",
+        "stale",
+        "reauthenticationRequired"
+      ],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/ContractVersion" },
+        "event": { "$ref": "#/$defs/SessionLifecycleEventType" },
+        "reason": { "$ref": "#/$defs/SessionClosureReason" },
+        "occurredAt": { "$ref": "#/$defs/UtcTimestamp" },
+        "lastSuccessfulAt": { "$ref": "#/$defs/UtcTimestamp" },
+        "stale": { "type": "boolean" },
+        "reauthenticationRequired": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
     "FailureClassification": {
       "type": "string",
       "enum": [

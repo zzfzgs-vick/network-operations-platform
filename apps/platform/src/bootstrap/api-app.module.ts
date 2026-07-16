@@ -20,9 +20,11 @@ import { ContractExceptionFilter } from "../http/contract-exception.filter.js";
 import { RequestIdMiddleware, requestIdFrom } from "../http/request-id.js";
 import { RuntimeLifecycle } from "../lifecycle.js";
 import { IdentityAccessModule } from "../modules/identity-access/identity-access.module.js";
+import { BrowserCsrfMiddleware } from "../modules/identity-access/adapters/http/browser-csrf.middleware.js";
 import { SessionAuthenticationMiddleware } from "../modules/identity-access/adapters/http/session-authentication.middleware.js";
 import { PublicEndpoint } from "../modules/identity-access/public.js";
 import { PlatformHealthApiModule } from "../modules/platform-health/platform-health.module.js";
+import { SseModule } from "../modules/sse/sse.module.js";
 
 @Injectable()
 class RuntimeDrainMiddleware implements NestMiddleware {
@@ -75,6 +77,7 @@ class RuntimeController {
     InternalServiceAuthModule,
     IdentityAccessModule,
     PlatformHealthApiModule,
+    SseModule,
   ],
   controllers: [RuntimeController],
   providers: [
@@ -87,6 +90,7 @@ export class ApiAppModule implements NestModule {
     consumer
       .apply(
         RequestIdMiddleware,
+        BrowserCsrfMiddleware,
         SessionAuthenticationMiddleware,
         RuntimeDrainMiddleware,
       )

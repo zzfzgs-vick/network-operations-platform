@@ -40,6 +40,7 @@ Module({
 const adminPassword = "t013-test-only-bootstrap-credential";
 const initialPassword = "t013-test-only-first-credential";
 const password = "t013-test-only-current-credential";
+const allowedOrigin = "https://network-operations.test";
 
 function issuedCookie(response, name) {
   const header = response.headers
@@ -83,12 +84,15 @@ test("opaque session HTTP login boundary", async (t) => {
   const address = app.getHttpServer().address();
   const origin = `http://127.0.0.1:${address.port}`;
 
-  const login = (username, suppliedPassword, cookie) =>
+  const login = (username, suppliedPassword, cookie, csrfToken) =>
     globalThis.fetch(`${origin}/api/auth/login`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        origin: allowedOrigin,
+        "x-csrf-confirm": "1",
         ...(cookie ? { cookie } : {}),
+        ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
       },
       body: JSON.stringify({ username, password: suppliedPassword }),
     });
@@ -106,6 +110,7 @@ test("opaque session HTTP login boundary", async (t) => {
     );
 
     let cookie;
+    let csrfToken;
     await t.test(
       "successful login creates a hardened cookie and protected principal",
       async () => {
@@ -113,6 +118,7 @@ test("opaque session HTTP login boundary", async (t) => {
         const body = await response.json();
         const setCookie = response.headers.get("set-cookie");
         cookie = issuedCookie(response, "__Host-nop_session");
+        csrfToken = response.headers.get("x-csrf-token");
         assert.equal(response.status, 200);
         assert.equal(body.status, "AUTHENTICATED");
         assert.equal(JSON.stringify(body).includes("token"), false);
@@ -158,7 +164,12 @@ test("opaque session HTTP login boundary", async (t) => {
       async () => {
         const response = await globalThis.fetch(`${origin}/api/auth/logout`, {
           method: "POST",
-          headers: { cookie },
+          headers: {
+            cookie,
+            origin: allowedOrigin,
+            "x-csrf-confirm": "1",
+            "x-csrf-token": csrfToken,
+          },
         });
         assert.equal(response.status, 204);
         assert.ok(
@@ -212,6 +223,7 @@ test("opaque session HTTP login boundary", async (t) => {
         authenticated,
         "__Host-nop_session",
       );
+      const authenticatedCsrf = authenticated.headers.get("x-csrf-token");
       const authenticatedSession = await pool.query(
         `select session_id from public.web_sessions
           where user_id = $1 order by created_at desc, session_id desc limit 1`,
@@ -234,6 +246,9 @@ test("opaque session HTTP login boundary", async (t) => {
         method: "POST",
         headers: {
           cookie: `${authenticatedCookie}; ${preAuthenticatedCookie}`,
+          origin: allowedOrigin,
+          "x-csrf-confirm": "1",
+          "x-csrf-token": authenticatedCsrf,
         },
       });
       assert.equal(response.status, 204);

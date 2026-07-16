@@ -29,7 +29,12 @@ test("web session policy fixes bounded pre-auth, idle, and absolute timeouts", (
     preAuthenticationTimeoutMs: 300_000,
     idleTimeoutMs: 1_800_000,
     absoluteTimeoutMs: 43_200_000,
+    revalidationIntervalMs: 5_000,
   });
+  assert.throws(
+    () => readWebSessionConfig({ SESSION_REVALIDATION_INTERVAL_MS: "60001" }),
+    /SESSION_REVALIDATION_INTERVAL_MS/u,
+  );
   assert.throws(
     () => readWebSessionConfig({ SESSION_PRE_AUTH_TIMEOUT_MS: "300001" }),
     /SESSION_PRE_AUTH_TIMEOUT_MS/u,

@@ -199,6 +199,27 @@ export function readApiListenConfig(
   };
 }
 
+export interface WebOriginConfig {
+  readonly origin: string;
+}
+
+export function readWebOriginConfig(
+  environment: Environment = process.env,
+): WebOriginConfig {
+  const fallback = `http://127.0.0.1:${environment.PORT ?? "3000"}`;
+  const url = httpUrl(environment, "WEB_ORIGIN", fallback);
+  if (url.origin === "null" || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("WEB_ORIGIN must contain only one HTTP origin");
+  }
+  if (
+    runtimeEnvironment(environment) === "production" &&
+    url.protocol !== "https:"
+  ) {
+    throw new Error("WEB_ORIGIN must use HTTPS in production");
+  }
+  return { origin: url.origin };
+}
+
 export interface RuntimeIdentityConfig {
   readonly version: string;
   readonly logLevel: "debug" | "info" | "warn" | "error";
@@ -340,6 +361,7 @@ export interface WebSessionConfig {
   readonly preAuthenticationTimeoutMs: number;
   readonly idleTimeoutMs: number;
   readonly absoluteTimeoutMs: number;
+  readonly revalidationIntervalMs: number;
 }
 
 export function readWebSessionConfig(
@@ -366,7 +388,19 @@ export function readWebSessionConfig(
     idleTimeoutMs,
     24 * 60 * 60 * 1000,
   );
-  return { preAuthenticationTimeoutMs, idleTimeoutMs, absoluteTimeoutMs };
+  const revalidationIntervalMs = integer(
+    environment,
+    "SESSION_REVALIDATION_INTERVAL_MS",
+    5_000,
+    100,
+    60_000,
+  );
+  return {
+    preAuthenticationTimeoutMs,
+    idleTimeoutMs,
+    absoluteTimeoutMs,
+    revalidationIntervalMs,
+  };
 }
 
 export function readRuntimeShutdownConfig(

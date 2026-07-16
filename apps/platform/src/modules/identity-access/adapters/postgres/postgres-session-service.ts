@@ -123,6 +123,7 @@ export class PostgresSessionService {
     const type: WebSessionType =
       user.mustChangePassword || needsMfa ? "PRE_AUTH" : "AUTHENTICATED";
     const token = randomBytes(32).toString("base64url");
+    const csrfToken = randomBytes(32).toString("base64url");
     const sessionId = randomUUID();
 
     const outcome = await withTransaction(this.pool, async (client) => {
@@ -175,19 +176,20 @@ export class PostgresSessionService {
       );
       await client.query(
         `insert into public.web_sessions (
-          session_id, user_id, session_type, token_hash, generation_id,
+          session_id, user_id, session_type, token_hash, csrf_token_hash, generation_id,
           authorization_version, credential_version, authentication_strength,
           password_verified_at, last_activity_at, idle_expires_at,
           absolute_expires_at, request_id, source_address, user_agent_summary
         ) values (
-          $1, $2, $3, $4, $5, $6, $7, 'PASSWORD', $8,
-          $9, $10, $11, $12, $13, $14
+          $1, $2, $3, $4, $5, $6, $7, $8, 'PASSWORD', $9,
+          $10, $11, $12, $13, $14, $15
         )`,
         [
           sessionId,
           user.userId,
           type,
           tokenDigest(token),
+          tokenDigest(csrfToken),
           generation.rows[0]!.generation_id,
           user.authorizationVersion,
           user.credentialVersion,
@@ -221,6 +223,7 @@ export class PostgresSessionService {
         sessionId,
         type,
         token,
+        csrfToken,
         expiresAt: expiresAt.toISOString(),
       };
     });
@@ -233,6 +236,24 @@ export class PostgresSessionService {
 
   validatePreAuthentication(token: string, requestId?: string) {
     return this.validate(token, "PRE_AUTH", requestId);
+  }
+
+  async validateCsrf(
+    sessionToken: string,
+    csrfToken: string,
+    expectedType: WebSessionType,
+    requestId?: string,
+  ) {
+    if (!/^[A-Za-z0-9_-]{43}$/u.test(csrfToken)) return false;
+    const session = await this.validate(sessionToken, expectedType, requestId);
+    const result = await this.pool.query<{ valid: boolean }>(
+      `select exists (
+         select 1 from public.web_sessions
+          where session_id = $1 and csrf_token_hash = $2 and revoked_at is null
+       ) as valid`,
+      [session.sessionId, tokenDigest(csrfToken)],
+    );
+    return result.rows[0]?.valid ?? false;
   }
 
   async recordUserActivity(token: string, requestId?: string) {

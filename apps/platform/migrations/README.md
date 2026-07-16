@@ -35,3 +35,6 @@ are display labels and never authorization conditions.
 
 `0007_postgres_opaque_sessions.up.sql` owns SHA-256-digested opaque web sessions and the
 single recovery generation marker. Raw session tokens are never persisted.
+
+`0008_csrf_session_foundation.up.sql` adds a per-session SHA-256-digested CSRF token. Existing
+active sessions are revoked during upgrade because they cannot prove possession of the new token.

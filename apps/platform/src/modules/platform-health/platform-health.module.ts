@@ -28,9 +28,11 @@ import {
 import { RuntimeLifecycle } from "../../lifecycle.js";
 import {
   AuthorizationMetrics,
+  CsrfMetrics,
   PublicEndpoint,
   SessionMetrics,
 } from "../identity-access/public.js";
+import { SessionSseMetrics } from "../sse/session-sse.js";
 import {
   PlatformHealthStore,
   type ReliableWorkMetrics,
@@ -209,6 +211,8 @@ class PlatformHealthController {
     private readonly serviceAuthentication: ServiceAuthenticationMetrics,
     private readonly authorization: AuthorizationMetrics,
     private readonly sessions: SessionMetrics,
+    private readonly csrf: CsrfMetrics,
+    private readonly sse: SessionSseMetrics,
   ) {}
 
   @Get("health/live")
@@ -242,6 +246,8 @@ class PlatformHealthController {
     const authenticationFailures = this.serviceAuthentication.snapshot();
     const authorizationDecisions = this.authorization.snapshot();
     const sessionEvents = this.sessions.snapshot();
+    const csrfRejections = this.csrf.snapshot();
+    const sseClosures = this.sse.snapshot();
     const lines = [
       metric(
         "nop_api_requests_success_total",
@@ -284,6 +290,18 @@ class PlatformHealthController {
       ...sessionEvents.map(
         (item) =>
           `nop_web_session_events_total{event="${item.event}",reason="${item.reason}"} ${item.count}`,
+      ),
+      "# HELP nop_csrf_rejections_total Browser CSRF rejections by bounded reason.",
+      "# TYPE nop_csrf_rejections_total counter",
+      ...csrfRejections.map(
+        (item) =>
+          `nop_csrf_rejections_total{reason="${item.reason}"} ${item.count}`,
+      ),
+      "# HELP nop_sse_session_closures_total SSE session closures by bounded reason.",
+      "# TYPE nop_sse_session_closures_total counter",
+      ...sseClosures.map(
+        (item) =>
+          `nop_sse_session_closures_total{reason="${item.reason}"} ${item.count}`,
       ),
       "# HELP nop_runtime_dependency_available Dependency readiness (1 available, 0 unavailable or stale).",
       "# TYPE nop_runtime_dependency_available gauge",

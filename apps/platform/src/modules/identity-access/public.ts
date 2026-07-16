@@ -27,6 +27,7 @@ export {
   type UserAuthorizer,
 } from "./application/authorization.js";
 export {
+  CsrfMetrics,
   SessionMetrics,
   SessionRejectedError,
   type IssuedWebSession,

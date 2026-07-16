@@ -68,8 +68,18 @@ if (selections[0] === "platform-health") {
       force: true,
     });
   }
-} else if (selections[0] === "service-auth" || selections[0] === "login") {
-  const ticket = selections[0] === "login" ? "t013" : "t008";
+} else if (
+  selections[0] === "service-auth" ||
+  selections[0] === "login" ||
+  selections[0] === "csrf" ||
+  selections[0] === "session-lifecycle"
+) {
+  const ticket =
+    selections[0] === "login"
+      ? "t013"
+      : selections[0] === "csrf" || selections[0] === "session-lifecycle"
+        ? "t014"
+        : "t008";
   const database = `nop_${ticket}_${randomUUID().replaceAll("-", "")}`;
   const databaseUser = process.env.DATABASE_USER ?? "nop";
   const compose = (args) =>
@@ -92,6 +102,8 @@ if (selections[0] === "platform-health") {
       DATABASE_QUERY_TIMEOUT_MS: "10000",
       COLLECTOR_SERVICE_TOKEN: "t008-test-only-collector-token-not-production",
       VMALERT_SERVICE_TOKEN: "t008-test-only-vmalert-token-not-production",
+      WEB_ORIGIN: "https://network-operations.test",
+      SESSION_REVALIDATION_INTERVAL_MS: "100",
     };
     run(process.execPath, ["apps/platform/dist/migrate.js", "up"], {
       env: environment,
@@ -99,7 +111,11 @@ if (selections[0] === "platform-health") {
     runTests(
       selections[0] === "login"
         ? "tests/integration/session/login.test.mjs"
-        : "tests/integration/config/service-auth.test.mjs",
+        : selections[0] === "csrf"
+          ? "tests/integration/session/csrf.test.mjs"
+          : selections[0] === "session-lifecycle"
+            ? "tests/integration/session/session-lifecycle.test.mjs"
+            : "tests/integration/config/service-auth.test.mjs",
       environment,
     );
   } finally {

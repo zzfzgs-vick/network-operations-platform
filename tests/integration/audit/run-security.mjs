@@ -10,11 +10,25 @@ if (
   ![
     "audit-redaction",
     "authorization",
+    "csrf",
     "password-policy",
     "session-cookie",
   ].includes(selections[0])
 ) {
   throw new Error(`Unknown security test selection: ${selections.join(" ")}`);
+}
+
+if (selections[0] === "csrf") {
+  const result = spawnSync(
+    process.execPath,
+    ["tests/integration/config/run.mjs", "csrf"],
+    { cwd: root, encoding: "utf8", stdio: "inherit" },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`CSRF tests exited with status ${result.status}`);
+  }
+  process.exit(0);
 }
 
 const testFileBySelection = {

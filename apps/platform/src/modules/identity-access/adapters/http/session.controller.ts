@@ -71,6 +71,8 @@ export class SessionController {
         ...clearedSessionCookies(),
         sessionCookie(session),
       ]);
+      response.setHeader("X-CSRF-Token", session.csrfToken);
+      response.setHeader("Cache-Control", "no-store");
       return {
         status:
           session.type === "PRE_AUTH"

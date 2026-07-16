@@ -8,6 +8,7 @@ import {
 import { AuditStore } from "../audit/public.js";
 import { readWebSessionConfig } from "../../config/public.js";
 import { SessionAuthenticationMiddleware } from "./adapters/http/session-authentication.middleware.js";
+import { BrowserCsrfMiddleware } from "./adapters/http/browser-csrf.middleware.js";
 import { SessionController } from "./adapters/http/session.controller.js";
 import { PostgresAuthorizationService } from "./adapters/postgres/postgres-authorization-service.js";
 import { PostgresSessionService } from "./adapters/postgres/postgres-session-service.js";
@@ -16,7 +17,7 @@ import {
   AuthorizationMetrics,
   USER_AUTHORIZER,
 } from "./application/authorization.js";
-import { SessionMetrics } from "./application/session.js";
+import { CsrfMetrics, SessionMetrics } from "./application/session.js";
 
 @Global()
 @Module({
@@ -25,6 +26,7 @@ import { SessionMetrics } from "./application/session.js";
   providers: [
     AuthorizationMetrics,
     SessionMetrics,
+    CsrfMetrics,
     {
       provide: PostgresAuthorizationService,
       inject: [DatabaseService, AuthorizationMetrics],
@@ -65,15 +67,18 @@ import { SessionMetrics } from "./application/session.js";
       },
     },
     SessionAuthenticationMiddleware,
+    BrowserCsrfMiddleware,
     PermissionGuard,
     { provide: APP_GUARD, useExisting: PermissionGuard },
   ],
   exports: [
     AuthorizationMetrics,
     SessionMetrics,
+    CsrfMetrics,
     PostgresAuthorizationService,
     PostgresSessionService,
     SessionAuthenticationMiddleware,
+    BrowserCsrfMiddleware,
   ],
 })
 export class IdentityAccessModule {}

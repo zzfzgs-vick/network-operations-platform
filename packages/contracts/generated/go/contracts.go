@@ -67,6 +67,35 @@ type RuntimeHealthResponse struct {
 	RequestID       *RequestID          `json:"requestId,omitempty"`
 }
 
+type SessionLifecycleEventType string
+
+const (
+	SessionLifecycleEventTypeConnected SessionLifecycleEventType = "CONNECTED"
+	SessionLifecycleEventTypeClosed    SessionLifecycleEventType = "CLOSED"
+)
+
+type SessionClosureReason string
+
+const (
+	SessionClosureReasonUnauthenticated      SessionClosureReason = "UNAUTHENTICATED"
+	SessionClosureReasonIdleExpired          SessionClosureReason = "IDLE_EXPIRED"
+	SessionClosureReasonAbsoluteExpired      SessionClosureReason = "ABSOLUTE_EXPIRED"
+	SessionClosureReasonRevoked              SessionClosureReason = "REVOKED"
+	SessionClosureReasonAuthorizationChanged SessionClosureReason = "AUTHORIZATION_CHANGED"
+	SessionClosureReasonCredentialChanged    SessionClosureReason = "CREDENTIAL_CHANGED"
+	SessionClosureReasonUnavailable          SessionClosureReason = "UNAVAILABLE"
+)
+
+type SessionLifecycleEvent struct {
+	ContractVersion          ContractVersion           `json:"contractVersion"`
+	Event                    SessionLifecycleEventType `json:"event"`
+	Reason                   *SessionClosureReason     `json:"reason,omitempty"`
+	OccurredAt               UtcTimestamp              `json:"occurredAt"`
+	LastSuccessfulAt         *UtcTimestamp             `json:"lastSuccessfulAt,omitempty"`
+	Stale                    bool                      `json:"stale"`
+	ReauthenticationRequired bool                      `json:"reauthenticationRequired"`
+}
+
 type FailureClassification string
 
 const (

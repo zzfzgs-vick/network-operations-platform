@@ -16,7 +16,27 @@ export interface IssuedWebSession {
   readonly sessionId: string;
   readonly type: WebSessionType;
   readonly token: string;
+  readonly csrfToken: string;
   readonly expiresAt: string;
+}
+
+export class CsrfMetrics {
+  private readonly counts = new Map<string, number>();
+
+  record(
+    reason:
+      | "missing-origin"
+      | "origin-mismatch"
+      | "missing-confirmation"
+      | "missing-token"
+      | "invalid-token",
+  ) {
+    this.counts.set(reason, (this.counts.get(reason) ?? 0) + 1);
+  }
+
+  snapshot() {
+    return [...this.counts].map(([reason, count]) => ({ reason, count }));
+  }
 }
 
 export interface ValidatedWebSession {
