@@ -1,7 +1,7 @@
 # T016：恢复码、MFA 重置、敏感操作与应急恢复
 
 ## 状态
-PLANNED
+READY
 
 ## 目标
 补齐 TOTP 丢失恢复、近期认证、Emergency Administrator 和宿主机 break-glass。

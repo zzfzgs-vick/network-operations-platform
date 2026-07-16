@@ -2,7 +2,16 @@
 
 ## 状态
 
-READY
+DONE
+
+## 完成记录
+
+- 完成日期：2026-07-17。
+- 对应 Git Commit：原始实现 `0bd590cd67376b0ff3ee4046b65314eecc30c574`；修正实现 `9aa06d689e4a173181da25092c3c939251fca4cd`。
+- CI 可识别信息：GitHub Actions workflow `quality`，run `29528724112`；Ubuntu 24.04 与 Windows 均通过；运行地址：<https://github.com/zzfzgs-vick/network-operations-platform/actions/runs/29528724112>。
+- 验收结果：TOTP security tests 3/3、MFA Login integration tests 8/8，T004～T014 回归通过。
+- Enrollment 超时：使用 PostgreSQL 权威时间计算 `min(pre-auth expiresAt, DB clock + enrollmentTimeoutMs)`；数据库存储与 API 返回一致，到期后验证失败，默认保持 5 分钟。
+- 敏感权限提升：通过真实 `PostgresAuthorizationService` 验证 `authorizationVersion` 自动递增、MFA 状态切换、旧 Session 立即失效、角色名称不参与敏感权限判断，以及权限变化与审计的事务语义。
 
 ## 目标
 

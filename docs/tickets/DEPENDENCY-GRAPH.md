@@ -25,8 +25,8 @@ flowchart TD
     T012["T012 DONE · 权限集合与 RBAC"]
     T013["T013 DONE · PostgreSQL 不透明会话"]
     T014["T014 DONE · CSRF 与会话/SSE 生命周期"]
-    T015["T015 READY · TOTP 注册与登录"]
-    T016["T016 MFA 恢复与 break-glass"]
+    T015["T015 DONE · TOTP 注册与登录"]
+    T016["T016 READY · MFA 恢复与 break-glass"]
     T017["T017 认证安全验收"]
   end
   subgraph P3["Phase 3 资产与拓扑权威数据"]
@@ -244,7 +244,7 @@ flowchart TD
 
 ## 可并行前沿
 
-- T001～T014 已完成；T015 的前置依赖已满足，按当前严格串行顺序继续实施。
+- T001～T015 已完成；T016 的前置依赖已满足，按当前严格串行顺序继续实施。
 - T019 完成且各自其他前置已完成后，T020、T023、T025 可以并行。
 - T027 完成后，T028 与已满足前置的 T031 可以并行；T032 和 T033 分属 Probe/Trap 路径。
 - T037 完成后，Health 路径 T038/T039 与 Alert 路径 T040/T041 可在各自前置满足后并行，最终汇合到 T042。
@@ -253,7 +253,7 @@ flowchart TD
 
 ## 当前可执行 Ticket
 
-[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T014：CSRF、防后台续期与 SSE 会话生命周期](T014-csrf-session-sse-lifecycle.md) 已为 DONE。按当前严格串行实施顺序，[T015：TOTP 注册、验证与敏感权限门控](T015-totp-enrollment-login.md) 为唯一 READY Ticket。
+[T001：跨平台 Monorepo 与质量基线](T001-cross-platform-monorepo-quality-baseline.md)～[T015：TOTP 注册、验证与敏感权限门控](T015-totp-enrollment-login.md) 已为 DONE。按当前严格串行实施顺序，[T016：恢复码、MFA 重置、敏感操作与应急恢复](T016-mfa-recovery-step-up-break-glass.md) 为唯一 READY Ticket。
 
 ## DAG 检查规则
 

@@ -1,6 +1,6 @@
 # MVP Implementation Roadmap
 
-状态：T001～T014 已完成，T015 已就绪
+状态：T001～T015 已完成，T016 已就绪
 
 ## 权威来源
 
@@ -15,7 +15,7 @@
 
 - 11 个 Epic/实施阶段（Phase 0～10）。
 - 60 张稳定编号 Ticket。
-- T001～T014 为 DONE；T015 是当前 READY Ticket；其余 Ticket 保持 PLANNED。
+- T001～T015 为 DONE；T016 是当前 READY Ticket；其余 Ticket 保持 PLANNED。
 - 数字顺序是合法拓扑顺序；部分同阶段 Ticket 可在共同前置完成后并行。
 - 非目标只作为范围守卫映射到验收 Ticket，不生成实现 Ticket。
 
@@ -47,8 +47,8 @@
 | [T012](T012-permission-rbac-enforcement.md) | 权限集合与 RBAC | T011 | DONE | 按依赖 |
 | [T013](T013-postgres-opaque-session-login.md) | PostgreSQL 不透明会话 | T012 | DONE | 按依赖 |
 | [T014](T014-csrf-session-sse-lifecycle.md) | CSRF 与会话/SSE 生命周期 | T013 | DONE | 可与同前置项并行 |
-| [T015](T015-totp-enrollment-login.md) | TOTP 注册与登录 | T013 | READY | 可与同前置项并行 |
-| [T016](T016-mfa-recovery-step-up-break-glass.md) | MFA 恢复与 break-glass | T015 | PLANNED | 按依赖 |
+| [T015](T015-totp-enrollment-login.md) | TOTP 注册与登录 | T013 | DONE | 可与同前置项并行 |
+| [T016](T016-mfa-recovery-step-up-break-glass.md) | MFA 恢复与 break-glass | T015 | READY | 按依赖 |
 | [T017](T017-authentication-security-acceptance.md) | 认证安全验收 | T009, T014, T016 | PLANNED | 按依赖 |
 
 ## Phase 3：资产与拓扑权威数据
@@ -341,4 +341,4 @@
 
 ## 首个执行项
 
-当前严格串行可执行项是 [T015：TOTP 注册、验证与敏感权限门控](T015-totp-enrollment-login.md)。T001～T014 已为 DONE，T015 的全部前置依赖均已完成。
+当前严格串行可执行项是 [T016：恢复码、MFA 重置、敏感操作与应急恢复](T016-mfa-recovery-step-up-break-glass.md)。T001～T015 已为 DONE，T016 的全部前置依赖均已完成。
